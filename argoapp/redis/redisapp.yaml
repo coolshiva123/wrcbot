@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: 'https://github.com/coolshiva123/wrcbot.git'   # <-- Change to your repo URL
     targetRevision: HEAD                               # or a branch/tag/commit
-    path: redis                                       # path to your Helm chart in the repo
+    path: argoapp/redis                                       # path to your Helm chart in the repo
     helm:
       valueFiles:
         - values.yaml
