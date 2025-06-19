@@ -6,8 +6,9 @@ image:
   pullPolicy: IfNotPresent
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 3141
+  nodePort: 32141
 
 slack:
   existingSecret: wrcbot-slack-token
