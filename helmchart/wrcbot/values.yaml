@@ -1,0 +1,15 @@
+replicaCount: 1
+
+image:
+  repository: errbotio/errbot
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3141
+
+slack:
+  token: ""  # Set your Slack bot token here or use a secret
+
+resources: {}

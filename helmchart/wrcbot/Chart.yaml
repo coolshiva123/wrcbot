@@ -1,0 +1,6 @@
+apiVersion: v2
+name: wrcbot
+description: A Helm chart for deploying Errbot as wrcbot
+type: application
+version: 0.1.0
+appVersion: "latest"
