@@ -10,6 +10,6 @@ service:
   port: 3141
 
 slack:
-  token: ""  # Set your Slack bot token here or use a secret
-
+  existingSecret: wrcbot-slack-token
+  existingSecretKey: SLACK_TOKEN
 resources: {}

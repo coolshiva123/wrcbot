@@ -19,7 +19,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: SLACK_TOKEN
-              value: "{{ .Values.slack.token }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.slack.existingSecret }}
+                  key: {{ .Values.slack.existingSecretKey }}
           ports:
             - containerPort: 3141
           resources:
