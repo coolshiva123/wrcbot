@@ -6,4 +6,4 @@ BOT_IDENTITY = {
 }
 BOT_DATA_DIR = '/data'
 BOT_LOG_LEVEL = 'INFO'
-BOT_ADMINS = ('awsterraform30',)
+BOT_ADMINS = ('@awsterraform30',)
