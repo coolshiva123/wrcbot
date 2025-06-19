@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: 'https://github.com/coolshiva123/wrcbot.git'
     targetRevision: HEAD
-    path: helmchart/errbot
+    path: helmchart/wrcbot
     helm:
       valueFiles:
         - values.yaml
