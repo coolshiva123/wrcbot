@@ -1,20 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: redis
+  name: wrcbot-apps
   namespace: argocd
 spec:
   project: wrcbot
   source:
     repoURL: 'https://github.com/coolshiva123/wrcbot.git'
     targetRevision: HEAD
-    path: argoapp/redis
-    helm:
-      valueFiles:
-        - values.yaml
+    path: argoapp/redis         # Directory containing redisapp.yaml
+    directory:
+      recurse: true             # Allows Argo CD to find Application manifests recursively
   destination:
     server: https://kubernetes.default.svc
-    namespace: wrcbot
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true

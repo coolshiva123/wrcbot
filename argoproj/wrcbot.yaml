@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: wrcbot
+  namespace: argocd
+spec:
+  description: Project for wrcbot applications
+  sourceRepos:
+    - 'https://github.com/coolshiva123/wrcbot.git'
+  destinations:
+    - namespace: wrcbot
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
