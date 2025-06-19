@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-RUN pip install errbot[slack]
+RUN pip install "errbot[slackapi]"
 
 COPY config.py /errbot/config.py
 
