@@ -1,5 +1,5 @@
 {{- define "wrcbot.name" -}}
-wrcbot-wrcbot
+wrcbot
 {{- end }}
 
 {{- define "wrcbot.fullname" -}}
