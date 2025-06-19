@@ -1,19 +1,20 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: wrcbot-apps
+  name: rabbitmq
   namespace: argocd
 spec:
   project: wrcbot
   source:
     repoURL: 'https://github.com/coolshiva123/wrcbot.git'
     targetRevision: HEAD
-    path: argoapp        # <-- Change to the parent directory containing both redisapp.yaml and rabbitmqapp.yaml
-    directory:
-      recurse: true
+    path: helmchart/rabbitmq
+    helm:
+      valueFiles:
+        - values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: wrcbot
   syncPolicy:
     automated:
       prune: true
