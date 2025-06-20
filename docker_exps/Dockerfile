@@ -1,11 +1,19 @@
-FROM python:3.11-slim
+FROM python:3.11-bullseye
 
-RUN pip install errbot errbot-backend-slack
-
-COPY config.py /errbot/config.py
-
-RUN mkdir -p /data
-
+# Set the working directory
 WORKDIR /errbot
 
-CMD ["errbot", "-c", "config.py"]
+# Copy the requirements file
+COPY requirements.txt .
+
+# Install the dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application code
+COPY src/ ./src/
+
+# Command to run the bot
+CMD ["errbot", "-c", "src/config.py"]
+
+# Keeps the container running in the background
+#CMD ["tail", "-f", "/dev/null"]

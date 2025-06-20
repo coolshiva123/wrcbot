@@ -1,0 +1,10 @@
+[Core]
+Name = helloworld
+Module = helloworld
+Core = True
+
+[Documentation]
+Description = Helloworld Errbot utils commands.
+
+[Python]
+Version = 2+
