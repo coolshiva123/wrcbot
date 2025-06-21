@@ -1,6 +1,6 @@
 [Core]
-Name = alive
-Module = alive
+Name = mypriorlife
+Module = mypriorlife
 Core = True
 
 [Documentation]

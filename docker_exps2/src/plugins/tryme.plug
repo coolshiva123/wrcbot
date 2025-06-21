@@ -7,4 +7,4 @@ Core = True
 Description = tryme Errbot utils commands.
 
 [Python]
-Version = 3+
+Version = 3

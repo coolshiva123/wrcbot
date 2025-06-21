@@ -1,4 +1,5 @@
 Errbot==6.2.0
 requests==2.31.0
 flask==2.3.3
+Errbot[slack]
 # Add any additional dependencies required for your plugins here.
