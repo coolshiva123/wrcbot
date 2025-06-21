@@ -1,0 +1,10 @@
+[Core]
+Name = mypriorlife
+Module = mypriorlife
+Core = True
+
+[Documentation]
+Description = tryme Errbot utils commands.
+
+[Python]
+Version = 3
