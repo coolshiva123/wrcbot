@@ -1,0 +1,2 @@
+errbot==6.2.0
+errbot-backend-slackv3
