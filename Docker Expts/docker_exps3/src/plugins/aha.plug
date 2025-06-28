@@ -1,0 +1,10 @@
+[Core]
+Name = aha
+Module = aha
+Core = True
+
+[Documentation]
+Description = aha Errbot utils commands.
+
+[Python]
+Version = 3

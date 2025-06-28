@@ -12,7 +12,5 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code
 COPY src/ ./src/
-# Expose the port for Errbot
-EXPOSE 3141
-# Command to run the bot
+#RUN ln -s /errbot/src/my_slack_backend.py /usr/local/lib/python3.11/site-packages/errbot/backends/my_slack_backend.py
 CMD ["errbot", "-c", "src/config.py"]
