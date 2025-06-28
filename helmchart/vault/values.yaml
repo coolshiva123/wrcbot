@@ -1,0 +1,114 @@
+# Default values for vault.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: hashicorp/vault
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.15.2"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    add:
+    - IPC_LOCK
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8200
+  targetPort: 8200
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: vault.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: vault-tls
+  #    hosts:
+  #      - vault.local
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Vault specific configuration
+vault:
+  # Set to true for development mode (NOT for production)
+  dev: true
+  # Development root token (only used in dev mode)
+  devRootToken: "myroot"
+  
+  # Vault configuration (used when dev: false)
+  config:
+    ui: true
+    listener:
+      tcp:
+        address: "0.0.0.0:8200"
+        tls_disable: true
+    storage:
+      file:
+        path: "/vault/data"
+    api_addr: "http://0.0.0.0:8200"
+    cluster_addr: "http://0.0.0.0:8201"
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: "manual"  # Use "manual" for static PV provisioning
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  
+  # Host path configuration for PV creation
+  hostPath:
+    enabled: true
+    path: "/home/ec2-user/vaultdata"
+    # List of nodes where this path exists (replace with your actual node names)
+    allowedNodes:
+      - "your-node-name"  # Replace with: kubectl get nodes --no-headers -o custom-columns=":metadata.name"
