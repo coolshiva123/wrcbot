@@ -35,11 +35,11 @@ spec:
             - sh
             - -c
             - |
-              # Create directory and set permissions
+              # Create directory and set permissions for Minikube
               mkdir -p /vault/data
               chown -R 1000:1000 /vault/data
               chmod -R 755 /vault/data
-              echo "Vault data directory initialized successfully"
+              echo "Vault data directory initialized for Minikube"
           volumeMounts:
             - name: vault-data
               mountPath: /vault/data
