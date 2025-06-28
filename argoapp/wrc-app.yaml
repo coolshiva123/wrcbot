@@ -8,9 +8,10 @@ spec:
   source:
     repoURL: 'https://github.com/coolshiva123/wrcbot.git'
     targetRevision: HEAD
-    path: argoapp        # <-- Change to the parent directory containing both redisapp.yaml and rabbitmqapp.yaml
+    path: argoapp
     directory:
-      recurse: true
+      recurse: false  # Don't recurse into subdirectories
+      include: '{redisapp.yaml,rabbitmqapp.yaml,vaultapp.yaml}'  # Only include specific app manifests
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
