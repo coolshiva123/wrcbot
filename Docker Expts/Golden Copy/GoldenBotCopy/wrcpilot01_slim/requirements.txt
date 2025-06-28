@@ -1,0 +1,7 @@
+# Core Errbot with Slack support
+errbot==6.2.0
+errbot-backend-slackv3
+slack-sdk
+
+# Essential dependencies (already included with errbot but pinned for consistency)
+requests>=2.31.0
