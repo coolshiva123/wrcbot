@@ -1,9 +1,13 @@
 # Default values for vault.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
 replicaCount: 1
 
 image:
-  repository: vault
+  repository: hashicorp/vault
   pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
   tag: "1.15.2"
 
 imagePullSecrets: []
@@ -11,8 +15,12 @@ nameOverride: ""
 fullnameOverride: ""
 
 serviceAccount:
+  # Specifies whether a service account should be created
   create: true
+  # Annotations to add to the service account
   annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
   name: ""
 
 podAnnotations: {}
@@ -31,17 +39,23 @@ securityContext:
 service:
   type: ClusterIP
   port: 8200
+  targetPort: 8200
 
 ingress:
   enabled: false
   className: ""
   annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
   hosts:
     - host: vault.local
       paths:
         - path: /
           pathType: Prefix
   tls: []
+  #  - secretName: vault-tls
+  #    hosts:
+  #      - vault.local
 
 resources:
   limits:
@@ -54,8 +68,9 @@ resources:
 autoscaling:
   enabled: false
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 100
   targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
 
 nodeSelector: {}
 
@@ -63,36 +78,29 @@ tolerations: []
 
 affinity: {}
 
-# Vault configuration
+# Vault specific configuration
 vault:
-  # Storage backend configuration
-  storage:
-    type: "file"  # Options: file, consul, etcd, etc.
-    config:
-      path: "/vault/data"
+  # Set to true for development mode (NOT for production)
+  dev: true
+  # Development root token (only used in dev mode)
+  devRootToken: "myroot"
   
-  # Listener configuration
-  listener:
-    tcp:
-      address: "0.0.0.0:8200"
-      tls_disable: true  # Set to false for production with proper certs
-  
-  # UI configuration
-  ui: true
-  
-  # Development mode (DO NOT use in production)
-  dev: false
-  
-  # Root token (only for dev mode)
-  rootToken: ""
+  # Vault configuration (used when dev: false)
+  config:
+    ui: true
+    listener:
+      tcp:
+        address: "0.0.0.0:8200"
+        tls_disable: true
+    storage:
+      file:
+        path: "/vault/data"
+    api_addr: "http://0.0.0.0:8200"
+    cluster_addr: "http://0.0.0.0:8201"
 
-# Persistent volume configuration
+# Persistence
 persistence:
   enabled: true
-  accessMode: ReadWriteOnce
-  size: 10Gi
   storageClass: ""
-
-# Init container to set proper permissions
-initContainer:
-  enabled: true
+  accessMode: ReadWriteOnce
+  size: 1Gi

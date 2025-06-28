@@ -27,43 +27,12 @@ spec:
       serviceAccountName: {{ include "vault.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if .Values.initContainer.enabled }}
-      initContainers:
-        - name: vault-init
-          image: busybox:1.35
-          command: 
-            - sh
-            - -c
-            - |
-              chown -R 1000:1000 /vault/data
-              chmod -R 755 /vault/data
-          volumeMounts:
-            - name: vault-data
-              mountPath: /vault/data
-          securityContext:
-            runAsUser: 0
-      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - vault
-            - server
-            - -config=/vault/config/vault.hcl
-          env:
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: VAULT_ADDR
-              value: "http://127.0.0.1:8200"
-            {{- if .Values.vault.dev }}
-            - name: VAULT_DEV_ROOT_TOKEN_ID
-              value: {{ .Values.vault.rootToken | quote }}
-            {{- end }}
           ports:
             - name: http
               containerPort: 8200
@@ -71,36 +40,60 @@ spec:
             - name: cluster
               containerPort: 8201
               protocol: TCP
+          env:
+            - name: VAULT_DEV_ROOT_TOKEN_ID
+              value: {{ .Values.vault.devRootToken | quote }}
+            - name: VAULT_DEV_LISTEN_ADDRESS
+              value: "0.0.0.0:8200"
+            {{- if .Values.vault.config }}
+            - name: VAULT_LOCAL_CONFIG
+              value: |
+                {{- .Values.vault.config | toYaml | nindent 16 }}
+            {{- end }}
+          command:
+            - "vault"
+          args:
+            - "server"
+            {{- if .Values.vault.dev }}
+            - "-dev"
+            {{- else }}
+            - "-config=/vault/config"
+            {{- end }}
           livenessProbe:
             httpGet:
-              path: /v1/sys/health?standbyok=true&uninitcode=200&drsecondarycode=200&performancestandbycode=200
+              path: /v1/sys/health?standbyok=true
               port: http
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /v1/sys/health?standbyok=true&uninitcode=200&drsecondarycode=200&performancestandbycode=200
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
               port: http
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - name: vault-config
-              mountPath: /vault/config
+            {{- if .Values.persistence.enabled }}
             - name: vault-data
               mountPath: /vault/data
+            {{- end }}
+            {{- if not .Values.vault.dev }}
+            - name: vault-config
+              mountPath: /vault/config
+              readOnly: true
+            {{- end }}
       volumes:
+        {{- if .Values.persistence.enabled }}
+        - name: vault-data
+          persistentVolumeClaim:
+            claimName: {{ include "vault.fullname" . }}-data
+        {{- end }}
+        {{- if not .Values.vault.dev }}
         - name: vault-config
           configMap:
             name: {{ include "vault.fullname" . }}-config
-        - name: vault-data
-          {{- if .Values.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "vault.fullname" . }}-data
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
