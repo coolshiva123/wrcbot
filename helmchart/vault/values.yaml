@@ -1,0 +1,98 @@
+# Default values for vault.
+replicaCount: 1
+
+image:
+  repository: vault
+  pullPolicy: IfNotPresent
+  tag: "1.15.2"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    add:
+    - IPC_LOCK
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8200
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: vault.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Vault configuration
+vault:
+  # Storage backend configuration
+  storage:
+    type: "file"  # Options: file, consul, etcd, etc.
+    config:
+      path: "/vault/data"
+  
+  # Listener configuration
+  listener:
+    tcp:
+      address: "0.0.0.0:8200"
+      tls_disable: true  # Set to false for production with proper certs
+  
+  # UI configuration
+  ui: true
+  
+  # Development mode (DO NOT use in production)
+  dev: false
+  
+  # Root token (only for dev mode)
+  rootToken: ""
+
+# Persistent volume configuration
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  storageClass: ""
+
+# Init container to set proper permissions
+initContainer:
+  enabled: true
