@@ -1,44 +1,44 @@
 #!/bin/bash
 
-# Script to prepare the host directory for Vault data and get node information
-# Run this on your EC2 instance before deploying Vault
+# Script to prepare the host directory for Vault data in Minikube
+# Run this to create the directory inside Minikube VM
 
-VAULT_DATA_DIR="/home/ec2-user/vaultdata"
+VAULT_DATA_DIR="/data/vaultdata"
 
-echo "=== Preparing Vault Host Directory ==="
+echo "=== Preparing Vault Directory in Minikube ==="
 
-# Create the directory if it doesn't exist
-echo "Creating Vault data directory: $VAULT_DATA_DIR"
-sudo mkdir -p "$VAULT_DATA_DIR"
-
-# Set proper ownership (1000:1000 is the vault user in the container)
-sudo chown -R 1000:1000 "$VAULT_DATA_DIR"
-
-# Set proper permissions
-sudo chmod -R 755 "$VAULT_DATA_DIR"
-
-echo "Directory created and configured successfully!"
-echo "Path: $VAULT_DATA_DIR"
-echo "Owner: $(ls -ld $VAULT_DATA_DIR | awk '{print $3":"$4}')"
-echo "Permissions: $(ls -ld $VAULT_DATA_DIR | awk '{print $1}')"
-
-echo ""
-echo "=== Getting Kubernetes Node Information ==="
-
-# Get the current node name for Kubernetes
-if command -v kubectl &> /dev/null; then
-    echo "Available Kubernetes nodes:"
-    kubectl get nodes --no-headers -o custom-columns=":metadata.name"
-    echo ""
-    echo "Please update your values.yaml with one of the node names above in:"
-    echo "persistence.hostPath.allowedNodes"
+# Check if running in Minikube environment
+if command -v minikube &> /dev/null; then
+    echo "Creating directory inside Minikube VM..."
+    
+    # Create directory inside Minikube VM
+    minikube ssh "sudo mkdir -p $VAULT_DATA_DIR"
+    minikube ssh "sudo chown -R 1000:1000 $VAULT_DATA_DIR"
+    minikube ssh "sudo chmod -R 755 $VAULT_DATA_DIR"
+    
+    echo "Directory created successfully in Minikube VM!"
+    echo "Path: $VAULT_DATA_DIR (inside Minikube VM)"
+    
+    # Verify the directory
+    echo "Verifying directory:"
+    minikube ssh "ls -la $VAULT_DATA_DIR"
+    
 else
-    echo "kubectl not found. Please install kubectl or get the node name manually."
-    echo "You can get the node name by running: kubectl get nodes"
+    echo "Minikube not found. Creating directory locally..."
+    echo "Note: This may not work if Minikube doesn't have access to this path"
+    
+    # Fallback - create locally
+    sudo mkdir -p "$VAULT_DATA_DIR"
+    sudo chown -R 1000:1000 "$VAULT_DATA_DIR"
+    sudo chmod -R 755 "$VAULT_DATA_DIR"
 fi
 
 echo ""
+echo "=== Minikube Node Information ==="
+kubectl get nodes --no-headers -o custom-columns=":metadata.name"
+
+echo ""
 echo "=== Next Steps ==="
-echo "1. Update values.yaml with the correct node name"
+echo "1. The directory has been created inside Minikube VM"
 echo "2. Commit and push your changes"
 echo "3. Sync the Vault application in ArgoCD"

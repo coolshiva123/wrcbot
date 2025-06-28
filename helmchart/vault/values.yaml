@@ -108,7 +108,7 @@ persistence:
   # Host path configuration for PV creation
   hostPath:
     enabled: true
-    path: "/home/ec2-user/vaultdata"
-    # List of nodes where this path exists (replace with your actual node names)
+    path: "/data/vaultdata"  # Path inside Minikube VM
+    # List of nodes where this path exists
     allowedNodes:
-      - "your-node-name"  # Replace with: kubectl get nodes --no-headers -o custom-columns=":metadata.name"
+      - "minikube"
