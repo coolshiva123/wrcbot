@@ -13,6 +13,12 @@ kubectl exec -it deployment/vault -n wrcbot -- vault operator unseal
 
 ## Getting Vault Credentials
 
+**Option 1: Using the credentials script**
+```bash
+./helmchart/vault/get-vault-credentials.sh
+```
+
+**Option 2: Manual commands**
 ```bash
 # Get root token
 kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d
@@ -20,6 +26,17 @@ kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base6
 # Get unseal key  
 kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d
 ```
+
+## Accessing Vault UI
+
+1. **Start port forwarding:**
+```bash
+kubectl port-forward svc/vault 8200:8200 -n wrcbot
+```
+
+2. **Open browser:** http://localhost:8200
+
+3. **Login with root token:** Use the token from `get-vault-credentials.sh`
 
 ## Getting Vault Credentialsons for persistent storage and deployment.
 
@@ -134,12 +151,22 @@ echo '{
 ./helmchart/vault/unseal-vault.sh
 ```
 
-**Method 2: One-liner**
+**Method 1b: Unseal and get UI token**
+```bash
+./helmchart/vault/unseal-vault.sh --show-token
+```
+
+**Method 2: Get credentials only**
+```bash
+./helmchart/vault/get-vault-credentials.sh
+```
+
+**Method 3: One-liner**
 ```bash
 UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d) && kubectl exec deployment/vault -n wrcbot -- vault operator unseal $UNSEAL_KEY
 ```
 
-**Method 3: Interactive**
+**Method 4: Interactive**
 ```bash
 kubectl exec -it deployment/vault -n wrcbot -- vault operator unseal
 # Then paste the unseal key when prompted
