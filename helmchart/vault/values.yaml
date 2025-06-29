@@ -2,12 +2,12 @@ storage:
   enabled: true
   accessModes:
     - ReadWriteOnce
-  size: 2Gi
+  size: 4Gi
   path: /home/ec2-user/vaultdata
 
 image:
-  repository: vault
-  tag: "latest"
+  repository: hashicorp/vault
+  tag: "1.15.2"
 
 replicaCount: 1
 

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: vault
-        image: vault:latest
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         ports:
         - containerPort: 8200
         env:

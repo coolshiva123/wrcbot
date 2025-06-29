@@ -39,3 +39,7 @@ Replace `my-vault` with your release name.
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
+
+Do this
+
+sudo mkdir -p /home/ec2-user/vaultdata && sudo chown $(whoami):$(whoami) /home/ec2-user/vaultdata

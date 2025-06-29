@@ -4,8 +4,21 @@ metadata:
   name: vault-pvc
 spec:
   accessModes:
+  {{- range .Values.storage.accessModes }}
+    - {{ . }}
+  {{- end }}
+  storageClassName: standard
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
+  volumeName: vault-pv v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-pvc
+spec:
+  accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 4Gi
   volumeName: vault-pv
