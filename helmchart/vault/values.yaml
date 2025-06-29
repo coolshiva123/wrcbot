@@ -1,0 +1,33 @@
+storage:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  path: /home/ec2-user/vaultdata
+
+image:
+  repository: vault
+  tag: "latest"
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+service:
+  type: ClusterIP
+  port: 8200
+
+config:
+  backend:
+    type: file
+    path: /vault/file
+  listener:
+    tcp:
+      address: 0.0.0.0:8200
+      tls_disable: 1
