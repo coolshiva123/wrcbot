@@ -14,6 +14,29 @@ spec:
       labels:
         {{- include "vault.selectorLabels" . | nindent 8 }}
     spec:
+      initContainers:
+      - name: vault-config-init
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat > /vault/config/vault.hcl << EOF
+          storage "file" {
+            path = "/vault/file"
+          }
+          listener "tcp" {
+            address = "0.0.0.0:8200"
+            tls_disable = 1
+          }
+          api_addr = "http://0.0.0.0:8200"
+          cluster_addr = "http://0.0.0.0:8201"
+          ui = true
+          disable_mlock = true
+          EOF
+        volumeMounts:
+        - name: vault-config
+          mountPath: /vault/config
       containers:
       - name: vault
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -31,23 +54,11 @@ spec:
           value: "http://0.0.0.0:8200"
         - name: VAULT_CLUSTER_ADDR
           value: "http://0.0.0.0:8201"
-        - name: VAULT_LOCAL_CONFIG
-          value: |
-            storage "file" {
-              path = "/vault/file"
-            }
-            listener "tcp" {
-              address = "0.0.0.0:8200"
-              tls_disable = 1
-            }
-            api_addr = "http://0.0.0.0:8200"
-            cluster_addr = "http://0.0.0.0:8201"
-            ui = true
-            disable_mlock = true
+        command:
+        - vault
         args:
-        - "vault"
-        - "server"
-        - "-config=/vault/config/config.hcl"
+        - server
+        - -config=/vault/config/vault.hcl
         securityContext:
           capabilities:
             add: ["IPC_LOCK"]
@@ -65,5 +76,4 @@ spec:
         persistentVolumeClaim:
           claimName: {{ include "vault.fullname" . }}-pvc
       - name: vault-config
-        configMap:
-          name: {{ include "vault.fullname" . }}-config
+        emptyDir: {}
