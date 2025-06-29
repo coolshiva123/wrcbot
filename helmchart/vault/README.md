@@ -43,3 +43,58 @@ This project is licensed under the MIT License. See the LICENSE file for details
 Do this
 
 sudo mkdir -p /home/ec2-user/vaultdata && sudo chown $(whoami):$(whoami) /home/ec2-user/vaultdata
+
+
+## Vault Seal/Unseal Operations
+
+**Unseal Key**: `xxxxx`  
+**Root Token**: `root`
+
+### Access Vault
+```bash
+# Set up port forwarding
+kubectl port-forward -n wrcbot svc/vault 8200:8200
+
+# Check status
+export VAULT_ADDR='http://localhost:8200'
+vault status
+```
+
+### Install Vault CLI
+```bash
+sudo yum install -y yum-utils && sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo && sudo yum -y install vault
+```
+
+### Seal Vault
+```bash
+# Seal the vault (requires root token)
+VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='root' vault operator seal
+```
+
+### Unseal Vault
+```bash
+# Unseal the vault (requires unseal key)
+VAULT_ADDR='http://localhost:8200' vault operator unseal lmiZUCyKqanlY1oW8JxnHaimyl5K4L0qfI6cdN+i5c4=
+```
+
+### Basic Operations
+```bash
+# Set environment variables
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN='root'
+
+# Check status
+vault status
+
+# List secrets engines
+vault secrets list
+
+# Store a secret
+vault kv put secret/myapp/config username=admin password=supersecret
+
+# Retrieve a secret
+vault kv get secret/myapp/config
+
+#API seal status
+curl -s http://localhost:8200/v1/sys/seal-status | jq '.'
+```
