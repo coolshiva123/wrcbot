@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+spec:
+  project: wrcbot
+  source:
+    repoURL: 'https://github.com/coolshiva123/wrcbot.git'
+    targetRevision: HEAD
+    path: helmchart/vault
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wrcbot
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
