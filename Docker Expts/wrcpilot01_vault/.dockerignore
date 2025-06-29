@@ -1,0 +1,38 @@
+# Documentation files
+*.md
+README.md
+GOLDEN_COPY_SUMMARY.md
+VERSION.md
+TESTING_CHECKLIST.md
+
+# Git files
+.git
+.gitignore
+
+# Development files
+.vscode
+.idea
+*.pyc
+__pycache__
+.pytest_cache
+.coverage
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Deployment scripts (not needed in container)
+deploy.sh
