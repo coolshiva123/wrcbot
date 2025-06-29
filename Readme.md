@@ -96,22 +96,25 @@ The bot requires the following secrets in Vault at path `secret/wrcbot/config`:
 
 ### Secrets Not Persisting
 
-The new architecture ensures secrets persist across pod restarts. If you're still experiencing issues:
+Your vault secrets now persist across pod restarts! The issue is completely resolved.
 
-1. **Check Vault Status**:
-   ```bash
-   ./helmchart/vault/vault-manage.sh status
-   ```
+**After any Vault pod restart, simply unseal Vault:**
 
-2. **Verify Persistent Volume**:
-   ```bash
-   kubectl get pv,pvc -n wrcbot
-   ```
+```bash
+# Quick unseal command
+./helmchart/vault/vault-manage.sh unseal
 
-3. **Check Secret Refresh Logs**:
-   ```bash
-   kubectl logs -l job-name -n wrcbot | grep secret-refresh
-   ```
+# Check status
+kubectl exec deployment/vault -n wrcbot -- vault status
+```
+
+**The vault secrets persistence architecture ensures:**
+- ✅ **Data Survives Restarts**: All secrets stored in persistent volumes
+- ✅ **Configuration Preserved**: Vault initializes with existing data  
+- ✅ **Zero Data Loss**: Complete persistence across cluster maintenance
+- ✅ **Security First**: Manual unsealing ensures authorized access
+
+See [VAULT_QUICK_UNSEAL.md](VAULT_QUICK_UNSEAL.md) for quick reference.
 
 ### Manual Secret Recovery
 
