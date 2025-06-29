@@ -1,6 +1,27 @@
 # Vault Helm Chart
 
-This Helm chart deploys HashiCorp Vault on a Kubernetes cluster. It includes the necessary configurations for persistent storage and deployment.
+This Helm chart deploys HashiCorp Vault on a Kubernetes cluster. It includes the necessary conf**Method 2: One-liner**
+```bash
+UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d) && kubectl exec deployment/vault -n wrcbot -- vault operator unseal $UNSEAL_KEY
+```
+
+**Method 3: Interactive**
+```bash
+kubectl exec -it deployment/vault -n wrcbot -- vault operator unseal
+# Then paste the unseal key when prompted
+```
+
+## Getting Vault Credentials
+
+```bash
+# Get root token
+kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d
+
+# Get unseal key  
+kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d
+```
+
+## Getting Vault Credentialsons for persistent storage and deployment.
 
 ## Prerequisites
 
@@ -100,8 +121,24 @@ curl -s http://localhost:8200/v1/sys/seal-status | jq '.'
 ```
 
 echo '{
-  "bot_token": "xxxx",
+  "bot_token": "xoxb-your-bot-token",
   "admin_users": "@awsterraform30",
-  "bot_signing_secret": "xxxxx",
-  "bot_app_token": "xxxxx"
+  "bot_signing_secret": "your-signing-secret",
+  "bot_app_token": "xapp-your-app-token"
 }' | VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='root' vault kv put secret/wrcbot/config -
+
+## Quick Vault Unsealing
+
+**Method 1: Using the script**
+```bash
+./unseal-vault.sh
+```
+
+**Method 2: One-liner**
+
+# Get root token
+kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d
+
+# Get unseal key  
+kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d
+```

@@ -4,10 +4,10 @@
 
 After any Vault pod restart, you need to manually unseal Vault:
 
-### Option 1: Using the Management Script (Recommended)
+### Option 1: Using the Unsealing Script (Recommended)
 ```bash
 cd /home/ec2-user/wrcbot
-./helmchart/vault/vault-manage.sh unseal
+./unseal-vault.sh
 ```
 
 ### Option 2: Manual Command
@@ -35,7 +35,14 @@ kubectl exec deployment/vault -n wrcbot -- vault status
 ## Verify Secrets
 ```bash
 # After unsealing, verify secrets are accessible
-./helmchart/vault/vault-manage.sh get-secrets
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d)
+
+# Start port forward
+kubectl port-forward svc/vault 8200:8200 -n wrcbot &
+
+# Check secrets
+vault kv get secret/wrcbot/config
 ```
 
 ---

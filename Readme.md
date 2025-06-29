@@ -35,13 +35,28 @@ kubectl apply -f argoapp/rabbitmqapp.yaml
 
 ### 2. Configure Vault Secrets
 
+**First, ensure Vault is unsealed:**
 ```bash
-# Use the vault management script
-./helmchart/vault/vault-manage.sh set-secrets
+./unseal-vault.sh
+```
 
-# Or manually set secrets via port forwarding
-./helmchart/vault/vault-manage.sh port-forward
-# Then visit http://localhost:8200 to access Vault UI
+**Then set secrets via port forwarding:**
+```bash
+# Start port forwarding
+kubectl port-forward svc/vault 8200:8200 -n wrcbot &
+
+# Set environment variables
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d)
+
+# Set secrets using vault CLI
+vault kv put secret/wrcbot/config \
+  bot_token="xoxb-your-token" \
+  admin_users="@awsterraform30" \
+  bot_signing_secret="your-secret" \
+  bot_app_token="xapp-your-token"
+
+# Or visit http://localhost:8200 to use Vault UI
 ```
 
 ### 3. Deploy the Bot
@@ -64,23 +79,43 @@ The Vault deployment now runs in production mode with:
 
 ### Managing Secrets
 
-Use the provided management script for common operations:
-
+**Check Vault status:**
 ```bash
-# Check Vault status
-./helmchart/vault/vault-manage.sh status
+kubectl exec deployment/vault -n wrcbot -- vault status
+```
 
-# Set bot secrets interactively
-./helmchart/vault/vault-manage.sh set-secrets
+**Unseal Vault if needed:**
+```bash
+./unseal-vault.sh
+```
 
-# View current secrets
-./helmchart/vault/vault-manage.sh get-secrets
+**Set bot secrets:**
+```bash
+# Port forward to Vault
+kubectl port-forward svc/vault 8200:8200 -n wrcbot &
 
-# Refresh Kubernetes secrets from Vault
-./helmchart/vault/vault-manage.sh refresh-secrets
+# Set environment variables
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d)
 
-# Restart bot to pick up new secrets
-./helmchart/vault/vault-manage.sh restart-bot
+# Set secrets
+vault kv put secret/wrcbot/config \
+  bot_token="xoxb-your-token" \
+  admin_users="@awsterraform30" \
+  bot_signing_secret="your-secret" \
+  bot_app_token="xapp-your-token"
+```
+
+**View current secrets:**
+```bash
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d)
+vault kv get secret/wrcbot/config
+```
+
+**Restart bot to pick up new secrets:**
+```bash
+kubectl rollout restart deployment/wrcbot -n wrcbot
 ```
 
 ### Required Secrets
@@ -102,7 +137,10 @@ Your vault secrets now persist across pod restarts! The issue is completely reso
 
 ```bash
 # Quick unseal command
-./helmchart/vault/vault-manage.sh unseal
+**Manual Vault Unsealing:**
+```bash
+./unseal-vault.sh
+```
 
 # Check status
 kubectl exec deployment/vault -n wrcbot -- vault status
@@ -118,14 +156,14 @@ See [VAULT_QUICK_UNSEAL.md](VAULT_QUICK_UNSEAL.md) for quick reference.
 
 ### Manual Secret Recovery
 
-If automatic processes fail:
+If you need to restart the bot to pick up secret changes:
 
 ```bash
-# Manually refresh secrets
-./helmchart/vault/vault-manage.sh refresh-secrets
+# Restart the bot deployment
+kubectl rollout restart deployment/wrcbot -n wrcbot
 
-# Restart the bot
-./helmchart/vault/vault-manage.sh restart-bot
+# Check deployment status
+kubectl rollout status deployment/wrcbot -n wrcbot
 ```
 
 ## Architecture

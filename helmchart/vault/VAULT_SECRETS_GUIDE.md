@@ -18,8 +18,8 @@ After a Vault pod restart, you'll need to manually unseal Vault. This is a secur
 ### Quick Unseal Commands
 
 ```bash
-# Method 1: Using the management script (recommended)
-./helmchart/vault/vault-manage.sh unseal
+# Method 1: Using the unsealing script (recommended)
+./unseal-vault.sh
 
 # Method 2: Manual unsealing
 UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d)
@@ -165,8 +165,8 @@ After a pod restart, Vault will be sealed and you need to unseal it manually:
 # Check if Vault is sealed
 kubectl exec deployment/vault -n wrcbot -- vault status
 
-# If sealed, unseal it using the management script
-./helmchart/vault/vault-manage.sh unseal
+# If sealed, unseal it using the unsealing script
+./unseal-vault.sh
 
 # Or manually unseal with the stored key
 UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d)
