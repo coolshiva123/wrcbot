@@ -35,6 +35,13 @@ kubectl apply -f argoapp/rabbitmqapp.yaml
 
 ### 2. Configure Vault Secrets
 
+**Method 1: Interactive script (Recommended):**
+```bash
+./helmchart/vault/set-vault-secrets.sh
+```
+
+**Method 2: Manual setup:**
+
 **First, ensure Vault is unsealed:**
 ```bash
 ./helmchart/vault/unseal-vault.sh

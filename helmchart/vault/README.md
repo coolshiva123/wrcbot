@@ -137,12 +137,35 @@ vault kv get secret/myapp/config
 curl -s http://localhost:8200/v1/sys/seal-status | jq '.'
 ```
 
+## Secret Management Scripts
+
+**Set secrets interactively:**
+```bash
+./helmchart/vault/set-vault-secrets.sh
+```
+
+**View existing secrets:**
+```bash
+./helmchart/vault/view-vault-secrets.sh
+./helmchart/vault/view-vault-secrets.sh --show-values  # Show actual values
+```
+
+**Get vault credentials:**
+```bash
+./helmchart/vault/get-vault-credentials.sh
+```
+
+## Manual Secret Setting (JSON Method)
+
+```bash
+# Example with your actual secrets (don't hardcode!)
 echo '{
-  "bot_token": "xoxb-your-bot-token",
+  "bot_token": "xoxb-your-actual-bot-token",
   "admin_users": "@awsterraform30",
-  "bot_signing_secret": "your-signing-secret",
-  "bot_app_token": "xapp-your-app-token"
-}' | VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='root' vault kv put secret/wrcbot/config -
+  "bot_signing_secret": "your-actual-signing-secret",
+  "bot_app_token": "xapp-your-actual-app-token"
+}' | VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='your-actual-root-token' vault kv put secret/wrcbot/config -
+```
 
 ## Quick Vault Unsealing
 

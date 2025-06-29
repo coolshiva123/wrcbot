@@ -84,7 +84,28 @@ kubectl port-forward svc/vault 8200:8200 -n wrcbot
 
 ### Setting Bot Secrets in Vault
 
-1. **Via Vault UI:**
+1. **Via Interactive Script (Recommended):**
+```bash
+./helmchart/vault/set-vault-secrets.sh
+```
+This script will:
+- Check if Vault is unsealed
+- Prompt for all required secrets interactively
+- Use JSON method to store secrets securely
+- Verify the secrets were stored correctly
+
+2. **Via JSON Method (Manual):**
+```bash
+# Create JSON payload with your secrets
+echo '{
+  "bot_token": "xoxb-your-actual-bot-token",
+  "admin_users": "@user1,@user2,@user3",
+  "bot_signing_secret": "your-actual-signing-secret",
+  "bot_app_token": "xapp-your-actual-app-token"
+}' | VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='your-actual-root-token' vault kv put secret/wrcbot/config -
+```
+
+3. **Via Vault UI:**
    - Navigate to `secret/` in the UI
    - Go to `wrcbot/config`
    - Add/update the following secrets:
@@ -93,7 +114,7 @@ kubectl port-forward svc/vault 8200:8200 -n wrcbot
      - `bot_signing_secret`: Bot signing secret
      - `bot_app_token`: Bot application token
 
-2. **Via Vault CLI:**
+4. **Via Vault CLI:**
 
 ```bash
 # Set environment variables
@@ -108,7 +129,7 @@ vault kv put secret/wrcbot/config \
   bot_app_token="xapp-your-app-token"
 ```
 
-3. **Via kubectl exec:**
+5. **Via kubectl exec:**
 
 ```bash
 # Exec into vault pod
@@ -125,6 +146,16 @@ vault kv put secret/wrcbot/config \
 
 ### Verifying Secrets
 
+**Using the view script (Recommended):**
+```bash
+# View secrets with masked values
+./helmchart/vault/view-vault-secrets.sh
+
+# View actual secret values (use with caution)
+./helmchart/vault/view-vault-secrets.sh --show-values
+```
+
+**Manual verification:**
 ```bash
 # Check if secrets are set correctly
 vault kv get secret/wrcbot/config
