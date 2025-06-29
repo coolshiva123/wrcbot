@@ -24,6 +24,40 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.vault.enabled }}
+      initContainers:
+      - name: vault-secrets-init
+        image: hashicorp/vault:1.15.2
+        env:
+        - name: VAULT_ADDR
+          value: {{ .Values.bot.env.VAULT_ADDR | quote }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for Vault to be ready
+          until vault status; do
+            echo "Waiting for Vault to be ready..."
+            sleep 5
+          done
+          
+          # Get root token from Vault keys secret
+          ROOT_TOKEN=$(kubectl get secret vault-keys -o jsonpath='{.data.root-token}' | base64 -d)
+          export VAULT_TOKEN=$ROOT_TOKEN
+          
+          # Fetch latest secrets from Vault and update them to shared volume
+          echo "Fetching secrets from Vault..."
+          vault kv get -format=json {{ .Values.vault.secretPath }} | jq -r '.data.data' > /vault-secrets/secrets.json
+          
+          {{- range $vaultKey, $envKey := .Values.vault.secrets }}
+          echo "$(cat /vault-secrets/secrets.json | jq -r '.{{ $vaultKey }}')" > /vault-secrets/{{ $vaultKey }}
+          {{- end }}
+          
+          echo "Secrets refreshed successfully"
+        volumeMounts:
+        - name: vault-secrets
+          mountPath: /vault-secrets
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -40,7 +74,7 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            # Vault secrets as environment variables
+            # Vault secrets as environment variables from files
             {{- if .Values.vault.enabled }}
             {{- range $vaultKey, $envKey := .Values.vault.secrets }}
             - name: {{ $envKey }}
@@ -64,16 +98,25 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
           volumeMounts:
+          {{- if .Values.persistence.enabled }}
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
           {{- end }}
-      {{- if .Values.persistence.enabled }}
+          {{- if .Values.vault.enabled }}
+            - name: vault-secrets
+              mountPath: /vault-secrets
+              readOnly: true
+          {{- end }}
       volumes:
+      {{- if .Values.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "wrcbot.fullname" . }}-data
+      {{- end }}
+      {{- if .Values.vault.enabled }}
+        - name: vault-secrets
+          emptyDir: {}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

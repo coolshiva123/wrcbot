@@ -13,14 +13,4 @@ spec:
   resources:
     requests:
       storage: {{ .Values.storage.size }}
-  volumeName: {{ include "vault.fullname" . }}-pv v1
-kind: PersistentVolumeClaim
-metadata:
-  name: vault-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 4Gi
-  volumeName: vault-pv
+  volumeName: {{ include "vault.fullname" . }}-pv

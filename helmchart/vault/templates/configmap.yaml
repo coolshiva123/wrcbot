@@ -1,11 +1,13 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vault-config
+  name: {{ include "vault.fullname" . }}-config
+  labels:
+    {{- include "vault.labels" . | nindent 4 }}
 data:
   config.hcl: |
     storage "file" {
-      path = "/home/ec2-user/vaultdata"
+      path = "/vault/file"
     }
     
     listener "tcp" {
@@ -13,5 +15,7 @@ data:
       tls_disable = 1
     }
     
-    api_addr = "http://<your-vault-address>:8200"
-    cluster_addr = "http://<your-vault-address>:8201"
+    api_addr = "http://0.0.0.0:8200"
+    cluster_addr = "http://0.0.0.0:8201"
+    ui = true
+    disable_mlock = true

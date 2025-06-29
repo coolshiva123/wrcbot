@@ -5,7 +5,10 @@ image:
   tag: "1.15.2"
 
 vault:
-  devRootToken: "root"
+  # Root token for initial setup (change this in production)
+  rootToken: "root"
+  # Enable production mode (not dev mode)
+  mode: "production"
 
 storage:
   enabled: true

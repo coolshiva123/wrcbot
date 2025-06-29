@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "vault.fullname" . }}-init
+  labels:
+    {{- include "vault.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      name: {{ include "vault.fullname" . }}-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: vault-init
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        env:
+        - name: VAULT_ADDR
+          value: "http://{{ include "vault.fullname" . }}:{{ .Values.service.port }}"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for Vault to be ready
+          until vault status; do
+            echo "Waiting for Vault to be ready..."
+            sleep 5
+          done
+          
+          # Check if Vault is already initialized
+          if vault status | grep -q "Initialized.*true"; then
+            echo "Vault is already initialized"
+            exit 0
+          fi
+          
+          # Initialize Vault
+          echo "Initializing Vault..."
+          vault operator init -key-shares=1 -key-threshold=1 -format=json > /tmp/vault-init.json
+          
+          # Extract unseal key and root token
+          UNSEAL_KEY=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[0]')
+          ROOT_TOKEN=$(cat /tmp/vault-init.json | jq -r '.root_token')
+          
+          # Unseal Vault
+          echo "Unsealing Vault..."
+          vault operator unseal $UNSEAL_KEY
+          
+          # Store the root token and unseal key in a Kubernetes secret
+          kubectl create secret generic {{ include "vault.fullname" . }}-keys \
+            --from-literal=root-token=$ROOT_TOKEN \
+            --from-literal=unseal-key=$UNSEAL_KEY \
+            --namespace={{ .Release.Namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Login with root token and enable KV secrets engine
+          export VAULT_TOKEN=$ROOT_TOKEN
+          vault auth $ROOT_TOKEN
+          vault secrets enable -path=secret kv-v2
+          
+          echo "Vault initialization completed successfully"
+      serviceAccountName: {{ include "vault.fullname" . }}-init

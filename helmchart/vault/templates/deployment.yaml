@@ -21,11 +21,36 @@ spec:
         - name: http
           containerPort: 8200
           protocol: TCP
+        - name: cluster
+          containerPort: 8201
+          protocol: TCP
         env:
-        - name: VAULT_DEV_ROOT_TOKEN_ID
-          value: {{ .Values.vault.devRootToken | quote }}
-        - name: VAULT_DEV_LISTEN_ADDRESS
-          value: "0.0.0.0:8200"
+        - name: VAULT_ADDR
+          value: "http://127.0.0.1:8200"
+        - name: VAULT_API_ADDR
+          value: "http://0.0.0.0:8200"
+        - name: VAULT_CLUSTER_ADDR
+          value: "http://0.0.0.0:8201"
+        - name: VAULT_LOCAL_CONFIG
+          value: |
+            storage "file" {
+              path = "/vault/file"
+            }
+            listener "tcp" {
+              address = "0.0.0.0:8200"
+              tls_disable = 1
+            }
+            api_addr = "http://0.0.0.0:8200"
+            cluster_addr = "http://0.0.0.0:8201"
+            ui = true
+            disable_mlock = true
+        args:
+        - "vault"
+        - "server"
+        - "-config=/vault/config/config.hcl"
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK"]
         {{- if .Values.resources }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
@@ -33,7 +58,12 @@ spec:
         volumeMounts:
         - name: vault-storage
           mountPath: /vault/file
+        - name: vault-config
+          mountPath: /vault/config
       volumes:
       - name: vault-storage
         persistentVolumeClaim:
           claimName: {{ include "vault.fullname" . }}-pvc
+      - name: vault-config
+        configMap:
+          name: {{ include "vault.fullname" . }}-config
