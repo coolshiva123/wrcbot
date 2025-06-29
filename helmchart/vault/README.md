@@ -74,7 +74,7 @@ VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='root' vault operator seal
 ### Unseal Vault
 ```bash
 # Unseal the vault (requires unseal key)
-VAULT_ADDR='http://localhost:8200' vault operator unseal lmiZUCyKqanlY1oW8JxnHaimyl5K4L0qfI6cdN+i5c4=
+VAULT_ADDR='http://localhost:8200' vault operator unseal
 ```
 
 ### Basic Operations
