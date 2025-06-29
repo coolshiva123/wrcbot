@@ -1,15 +1,18 @@
+replicaCount: 1
+
+image:
+  repository: hashicorp/vault
+  tag: "1.15.2"
+
+vault:
+  devRootToken: "root"
+
 storage:
   enabled: true
   accessModes:
     - ReadWriteOnce
   size: 4Gi
   path: /home/ec2-user/vaultdata
-
-image:
-  repository: hashicorp/vault
-  tag: "1.15.2"
-
-replicaCount: 1
 
 resources:
   requests:

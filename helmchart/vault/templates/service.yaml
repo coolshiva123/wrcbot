@@ -1,14 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: vault
+  name: {{ include "vault.fullname" . }}
   labels:
-    app: vault
+    {{- include "vault.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.service.type }}
   ports:
-    - port: 8200
-      targetPort: 8200
+    - port: {{ .Values.service.port }}
+      targetPort: http
       protocol: TCP
+      name: http
   selector:
-    app: vault
+    {{- include "vault.selectorLabels" . | nindent 4 }}

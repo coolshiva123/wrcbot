@@ -1,31 +1,39 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vault
+  name: {{ include "vault.fullname" . }}
   labels:
-    app: vault
+    {{- include "vault.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: vault
+      {{- include "vault.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: vault
+        {{- include "vault.selectorLabels" . | nindent 8 }}
     spec:
       containers:
       - name: vault
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         ports:
-        - containerPort: 8200
+        - name: http
+          containerPort: 8200
+          protocol: TCP
         env:
         - name: VAULT_DEV_ROOT_TOKEN_ID
-          value: "root"
+          value: {{ .Values.vault.devRootToken | quote }}
+        - name: VAULT_DEV_LISTEN_ADDRESS
+          value: "0.0.0.0:8200"
+        {{- if .Values.resources }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - name: vault-storage
           mountPath: /vault/file
       volumes:
       - name: vault-storage
         persistentVolumeClaim:
-          claimName: vault-pvc
+          claimName: {{ include "vault.fullname" . }}-pvc
