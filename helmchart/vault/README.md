@@ -98,3 +98,10 @@ vault kv get secret/myapp/config
 #API seal status
 curl -s http://localhost:8200/v1/sys/seal-status | jq '.'
 ```
+
+echo '{
+  "bot_token": "xxxx",
+  "admin_users": "@awsterraform30",
+  "bot_signing_secret": "xxxxx",
+  "bot_app_token": "xxxxx"
+}' | VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='root' vault kv put secret/wrcbot/config -
