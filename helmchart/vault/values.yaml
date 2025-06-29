@@ -2,7 +2,7 @@ storage:
   enabled: true
   accessModes:
     - ReadWriteOnce
-  size: 10Gi
+  size: 2Gi
   path: /home/ec2-user/vaultdata
 
 image:
