@@ -1,6 +1,6 @@
 #!/bin/bash
 # Vault Unsealing Script for ArgoCD Deployment
-# Usage: ./unseal-vault.sh
+# Usage: ./helmchart/vault/unseal-vault.sh
 
 echo "🔓 Unsealing Vault deployed via ArgoCD..."
 

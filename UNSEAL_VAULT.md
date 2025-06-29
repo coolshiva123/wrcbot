@@ -7,7 +7,7 @@ After any Vault pod restart, you need to manually unseal Vault:
 ### Option 1: Using the Unsealing Script (Recommended)
 ```bash
 cd /home/ec2-user/wrcbot
-./unseal-vault.sh
+./helmchart/vault/unseal-vault.sh
 ```
 
 ### Option 2: Manual Command

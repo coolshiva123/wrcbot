@@ -131,14 +131,16 @@ echo '{
 
 **Method 1: Using the script**
 ```bash
-./unseal-vault.sh
+./helmchart/vault/unseal-vault.sh
 ```
 
 **Method 2: One-liner**
+```bash
+UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d) && kubectl exec deployment/vault -n wrcbot -- vault operator unseal $UNSEAL_KEY
+```
 
-# Get root token
-kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.root-token}' | base64 -d
-
-# Get unseal key  
-kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d
+**Method 3: Interactive**
+```bash
+kubectl exec -it deployment/vault -n wrcbot -- vault operator unseal
+# Then paste the unseal key when prompted
 ```

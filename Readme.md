@@ -37,7 +37,7 @@ kubectl apply -f argoapp/rabbitmqapp.yaml
 
 **First, ensure Vault is unsealed:**
 ```bash
-./unseal-vault.sh
+./helmchart/vault/unseal-vault.sh
 ```
 
 **Then set secrets via port forwarding:**
@@ -86,7 +86,7 @@ kubectl exec deployment/vault -n wrcbot -- vault status
 
 **Unseal Vault if needed:**
 ```bash
-./unseal-vault.sh
+./helmchart/vault/unseal-vault.sh
 ```
 
 **Set bot secrets:**
@@ -139,7 +139,7 @@ Your vault secrets now persist across pod restarts! The issue is completely reso
 # Quick unseal command
 **Manual Vault Unsealing:**
 ```bash
-./unseal-vault.sh
+./helmchart/vault/unseal-vault.sh
 ```
 
 # Check status

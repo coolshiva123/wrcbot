@@ -9,7 +9,7 @@
 ## 🚀 Quick Unseal (One Command)
 ```bash
 cd /home/ec2-user/wrcbot
-./unseal-vault.sh
+./helmchart/vault/unseal-vault.sh
 ```
 
 ## 🔍 Check Status First
