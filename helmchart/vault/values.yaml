@@ -15,7 +15,7 @@ storage:
   accessModes:
     - ReadWriteOnce
   size: 4Gi
-  path: /home/ec2-user/vaultdata
+  path: /vaultdata
 
 resources:
   requests:

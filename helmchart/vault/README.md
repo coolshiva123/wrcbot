@@ -1,6 +1,88 @@
 # Vault Helm Chart
 
-This Helm chart deploys HashiCorp Vault on a Kubernetes cluster. It includes the necessary conf**Method 2: One-liner**
+This Helm chart deploys HashiCorp Vault on a Kubernetes cluster with data persistence support.
+
+## ⚠️ Data Persistence Important Information
+
+**Current Limitation**: Due to minikube running in Docker mode, true filesystem persistence between minikube restarts is not supported. However, this setup provides:
+
+✅ **Data persistence as long as minikube is running** (stop/start OK)  
+✅ **Backup/restore mechanism** for minikube delete/recreate scenarios  
+✅ **Easy data migration** between minikube clusters  
+
+## Quick Start
+
+```bash
+# Setup Vault with persistence support
+./helmchart/vault/setup-vault-persistence.sh
+
+# Unseal Vault
+./helmchart/vault/unseal-vault.sh
+
+# Set up secrets
+./helmchart/vault/set-vault-secrets.sh
+```
+
+## Data Persistence Workflow
+
+### Before Minikube Restart
+```bash
+# Always backup your data first!
+./helmchart/vault/backup-vault-data.sh
+```
+
+### After Minikube Restart
+```bash
+# Deploy Vault
+kubectl apply -f /home/ec2-user/wrcbot/argoproj/wrcbot.yaml
+
+# Restore your data
+./helmchart/vault/restore-vault-data.sh
+
+# Unseal Vault
+./helmchart/vault/unseal-vault.sh
+```
+
+## Prerequisites
+
+- Kubernetes cluster (minikube)
+- kubectl configured
+- ArgoCD deployed (for GitOps deployment)
+
+## Available Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `setup-vault-persistence.sh` | Complete setup with persistence support |
+| `backup-vault-data.sh` | Backup Vault data before minikube restart |
+| `restore-vault-data.sh` | Restore Vault data after minikube restart |
+| `unseal-vault.sh` | Unseal Vault (required after each restart) |
+| `get-vault-credentials.sh` | Get root token and unseal key |
+| `set-vault-secrets.sh` | Interactive secret management |
+| `view-vault-secrets.sh` | View stored secrets (safely) |
+
+## Manual Installation (if not using setup script)
+
+### Deploy using ArgoCD
+```bash
+kubectl apply -f /home/ec2-user/wrcbot/argoproj/wrcbot.yaml
+```
+
+### Wait for deployment
+```bash
+kubectl wait --for=condition=ready pod -l app=vault -n wrcbot --timeout=300s
+```
+
+## Unsealing Vault
+
+Vault starts in a sealed state and must be unsealed before use.
+
+**Method 1: Using the unseal script (recommended)**
+```bash
+./helmchart/vault/unseal-vault.sh
+```
+
+**Method 2: One-liner**
 ```bash
 UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d) && kubectl exec deployment/vault -n wrcbot -- vault operator unseal $UNSEAL_KEY
 ```
@@ -38,159 +120,115 @@ kubectl port-forward svc/vault 8200:8200 -n wrcbot
 
 3. **Login with root token:** Use the token from `get-vault-credentials.sh`
 
-## Getting Vault Credentialsons for persistent storage and deployment.
+## Setting Up Secrets
 
-## Prerequisites
-
-- Kubernetes cluster
-- Helm 3.x installed
-- Access to the EC2 instance where the PersistentVolume will be created
-
-## Installation
-
-To install the chart, use the following command:
-
-```bash
-helm install my-vault ./vault-helm-chart
-```
-
-Replace `my-vault` with your desired release name.
-
-## Configuration
-
-You can customize the deployment by modifying the `values.yaml` file. This file contains default configuration values that can be overridden.
-
-## Persistent Storage
-
-This chart creates a PersistentVolume and PersistentVolumeClaim to store Vault data. The data will be stored at the path `/home/ec2-user/vaultdata` on the EC2 instance.
-
-## Uninstallation
-
-To uninstall the chart, use the following command:
-
-```bash
-helm uninstall my-vault
-```
-
-Replace `my-vault` with your release name.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-Do this
-
-sudo mkdir -p /home/ec2-user/vaultdata && sudo chown $(whoami):$(whoami) /home/ec2-user/vaultdata
-
-
-## Vault Seal/Unseal Operations
-
-**Unseal Key**: `xxxxx`  
-**Root Token**: `root`
-
-### Access Vault
-```bash
-# Set up port forwarding
-kubectl port-forward -n wrcbot svc/vault 8200:8200
-
-# Check status
-export VAULT_ADDR='http://localhost:8200'
-vault status
-```
-
-### Install Vault CLI
-```bash
-sudo yum install -y yum-utils && sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo && sudo yum -y install vault
-```
-
-### Seal Vault
-```bash
-# Seal the vault (requires root token)
-VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='root' vault operator seal
-```
-
-### Unseal Vault
-```bash
-# Unseal the vault (requires unseal key)
-VAULT_ADDR='http://localhost:8200' vault operator unseal
-```
-
-### Basic Operations
-```bash
-# Set environment variables
-export VAULT_ADDR='http://localhost:8200'
-export VAULT_TOKEN='root'
-
-# Check status
-vault status
-
-# List secrets engines
-vault secrets list
-
-# Store a secret
-vault kv put secret/myapp/config username=admin password=supersecret
-
-# Retrieve a secret
-vault kv get secret/myapp/config
-
-#API seal status
-curl -s http://localhost:8200/v1/sys/seal-status | jq '.'
-```
-
-## Secret Management Scripts
-
-**Set secrets interactively:**
+**Interactive method (recommended):**
 ```bash
 ./helmchart/vault/set-vault-secrets.sh
 ```
 
-**View existing secrets:**
+**Manual method:**
+```bash
+# Login to Vault
+kubectl exec -it deployment/vault -n wrcbot -- vault auth -method=token token=<root-token>
+
+# Create secrets
+kubectl exec -it deployment/vault -n wrcbot -- vault kv put secret/wrcbot/config \
+    RABBITMQ_HOST=rabbitmq.wrcbot.svc.cluster.local \
+    RABBITMQ_PORT=5672 \
+    RABBITMQ_USERNAME=user \
+    RABBITMQ_PASSWORD=your-password
+```
+
+## Viewing Secrets
+
+**Safe viewing (values masked):**
 ```bash
 ./helmchart/vault/view-vault-secrets.sh
-./helmchart/vault/view-vault-secrets.sh --show-values  # Show actual values
 ```
 
-**Get vault credentials:**
+**Show actual values:**
 ```bash
-./helmchart/vault/get-vault-credentials.sh
+./helmchart/vault/view-vault-secrets.sh --show-values
 ```
 
-## Manual Secret Setting (JSON Method)
+## Troubleshooting
 
+### Vault Pod Not Starting
 ```bash
-# Example with your actual secrets (don't hardcode!)
-echo '{
-  "bot_token": "xoxb-your-actual-bot-token",
-  "admin_users": "@awsterraform30",
-  "bot_signing_secret": "your-actual-signing-secret",
-  "bot_app_token": "xapp-your-actual-app-token"
-}' | VAULT_ADDR='http://localhost:8200' VAULT_TOKEN='your-actual-root-token' vault kv put secret/wrcbot/config -
+kubectl describe pod -l app=vault -n wrcbot
+kubectl logs -l app=vault -n wrcbot
 ```
 
-## Quick Vault Unsealing
-
-**Method 1: Using the script**
+### Vault Sealed
 ```bash
 ./helmchart/vault/unseal-vault.sh
 ```
 
-**Method 1b: Unseal and get UI token**
+### Check Vault Status
 ```bash
-./helmchart/vault/unseal-vault.sh --show-token
+kubectl exec deployment/vault -n wrcbot -- vault status
 ```
 
-**Method 2: Get credentials only**
+### Backup/Restore Issues
 ```bash
-./helmchart/vault/get-vault-credentials.sh
+# List available backups
+ls -la /home/ec2-user/vault-persistent-data/
+
+# Check if Vault pod is running
+kubectl get pods -n wrcbot -l app=vault
+
+# Manual backup
+kubectl exec -n wrcbot deployment/vault -- tar czf - /vault/file > manual-backup.tar.gz
 ```
 
-**Method 3: One-liner**
-```bash
-UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' | base64 -d) && kubectl exec deployment/vault -n wrcbot -- vault operator unseal $UNSEAL_KEY
+## Data Backup Location
+
+Backups are stored in: `/home/ec2-user/vault-persistent-data/`
+
+## Security Notes
+
+- The root token is stored in Kubernetes secrets
+- All secrets are base64 encoded (not encrypted at rest by default)
+- Consider using external secret management for production
+- Vault data is stored in `/tmp/vault-data` inside the minikube container
+
+## Configuration
+
+The Vault configuration can be customized by editing `values.yaml`:
+
+```yaml
+storage:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 4Gi
+  path: /tmp/vault-data  # Path inside minikube container
+
+vault:
+  rootToken: "root"      # Change for production
+  mode: "production"     # production or dev
 ```
 
-**Method 4: Interactive**
-```bash
-kubectl exec -it deployment/vault -n wrcbot -- vault operator unseal
-# Then paste the unseal key when prompted
-```
+## Persistent Volume Behavior
+
+- **Path**: `/tmp/vault-data` (inside minikube container)
+- **Persistence**: Data survives pod restarts but NOT minikube restarts
+- **Backup**: Use `backup-vault-data.sh` before minikube operations
+- **Restore**: Use `restore-vault-data.sh` after minikube restart
+
+## Production Considerations
+
+For production environments, consider:
+
+1. **External Storage**: Use cloud storage or network-attached storage
+2. **Auto-unseal**: Configure auto-unseal with cloud key management
+3. **High Availability**: Deploy multiple Vault instances
+4. **Backup Automation**: Automated backup scheduling
+5. **Secret Rotation**: Implement secret rotation policies
+
+## References
+
+- [HashiCorp Vault Documentation](https://www.vaultproject.io/docs)
+- [Vault on Kubernetes](https://www.vaultproject.io/docs/platform/k8s)
+- [Vault Helm Chart](https://github.com/hashicorp/vault-helm)
