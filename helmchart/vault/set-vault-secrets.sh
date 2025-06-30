@@ -60,6 +60,7 @@ read_secret "Bot Token (xoxb-...)" "BOT_TOKEN" "true"
 read_secret "Admin Users (comma-separated, e.g., @user1,@user2)" "ADMIN_USERS" "false"
 read_secret "Bot Signing Secret" "BOT_SIGNING_SECRET" "true"
 read_secret "Bot App Token (xapp-...)" "BOT_APP_TOKEN" "true"
+read_secret "Bot Prefix as '<@member_id>'" "BOT_PREFIX" "true"
 
 echo ""
 echo "📋 Collected secrets summary:"
@@ -67,6 +68,7 @@ echo "   Bot Token: ${BOT_TOKEN:0:10}..."
 echo "   Admin Users: $ADMIN_USERS"
 echo "   Bot Signing Secret: ${BOT_SIGNING_SECRET:0:8}..."
 echo "   Bot App Token: ${BOT_APP_TOKEN:0:10}..."
+echo "   Bot Prefix: $BOT_PREFIX"
 echo ""
 
 # Confirm before proceeding
@@ -83,7 +85,8 @@ JSON_PAYLOAD=$(cat <<EOF
   "bot_token": "$BOT_TOKEN",
   "admin_users": "$ADMIN_USERS", 
   "bot_signing_secret": "$BOT_SIGNING_SECRET",
-  "bot_app_token": "$BOT_APP_TOKEN"
+  "bot_app_token": "$BOT_APP_TOKEN",
+  "bot_prefix": "$BOT_PREFIX"
 }
 EOF
 )
@@ -98,7 +101,7 @@ PORT_FORWARD_PID=$!
 
 # Wait for port-forward to be ready
 sleep 3
-
+:
 # Verify port-forward is working
 if ! curl -s http://localhost:8200/v1/sys/health >/dev/null; then
     echo "❌ Failed to establish port-forward to Vault"
