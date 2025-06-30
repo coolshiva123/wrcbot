@@ -151,7 +151,7 @@ kubectl describe pod -n wrcbot -l app.kubernetes.io/name=wrcbot
 
 ### Current Admin Credentials
 - **Username**: `admin`
-- **Password**: `admin123` (reset on 2025-06-30)
+- **Password**: Use the method below to get the current password
 
 ### Accessing ArgoCD UI
 ```bash
@@ -165,18 +165,25 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 ### Password Reset Process
 If you forget the ArgoCD admin password, you can reset it:
 
-1. **Method 1: Using Initial Admin Secret (if available)**
+1. **Method 1: Get Current Initial Password**
    ```bash
+   # Get password from ArgoCD server pod
+   kubectl exec -n argocd $(kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o name) -- argocd admin initial-password
+   
+   # Or from initial admin secret (if available)
    kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
    ```
 
 2. **Method 2: Reset via ArgoCD Secret**
    ```bash
-   # Set password to 'admin123'
-   kubectl patch secret argocd-secret -n argocd --type merge -p '{"data":{"admin.password":"JDJhJDEwJE8yOGN4WDhGZ0JZbDNWQ0VYd2owUy5uWVFCTXNEQTdELk1vcFRjYTg3SkRCMXNjRTdqSG0y"}}'
+   # Remove existing password to force regeneration
+   kubectl patch secret argocd-secret -n argocd --type json -p='[{"op": "remove", "path": "/data/admin.password"}]'
    
    # Restart ArgoCD server
    kubectl rollout restart deployment argocd-server -n argocd
+   
+   # Get new password
+   kubectl exec -n argocd $(kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o name) -- argocd admin initial-password
    ```
 
 3. **Method 3: Generate New Random Password**
@@ -188,5 +195,28 @@ If you forget the ArgoCD admin password, you can reset it:
    # Get the new password
    kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
    ```
+
+### ArgoCD CLI Access
+Once you have the port-forward running, you can use the ArgoCD CLI:
+
+```bash
+# Get the current admin password first
+ADMIN_PASSWORD=$(kubectl exec -n argocd $(kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o name) -- argocd admin initial-password | head -1)
+
+# Login (after port-forward is established)
+argocd login localhost:8080 --username admin --password "$ADMIN_PASSWORD" --insecure
+
+# List all applications
+argocd app list
+
+# Get specific application details
+argocd app get wrcbot
+
+# Sync an application
+argocd app sync wrcbot
+
+# Check application status
+argocd app wait wrcbot
+```
 
 ## Deployment Steps
