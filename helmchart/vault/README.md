@@ -232,3 +232,8 @@ For production environments, consider:
 - [HashiCorp Vault Documentation](https://www.vaultproject.io/docs)
 - [Vault on Kubernetes](https://www.vaultproject.io/docs/platform/k8s)
 - [Vault Helm Chart](https://github.com/hashicorp/vault-helm)
+
+
+Initialize Vault
+
+export VAULT_ADDR=http://localhost:8200 && vault operator init -key-shares=1 -key-threshold=1 -format=json
