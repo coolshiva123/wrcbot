@@ -12,4 +12,4 @@ data:
   # Default configuration
   log_level: "INFO"
   plugin_dir: "/app/plugins"
-  data_dir: {{ .Values.persistence.mountPath | quote }}
+  data_dir: "/tmp/data"

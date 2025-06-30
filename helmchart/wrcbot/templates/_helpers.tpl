@@ -49,10 +49,3 @@ Selector labels
 app.kubernetes.io/name: {{ include "wrcbot.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
-
-{{/*
-Create the vault secret name
-*/}}
-{{- define "wrcbot.vaultSecretName" -}}
-{{- printf "%s-vault-secrets" (include "wrcbot.fullname" .) }}
-{{- end }}

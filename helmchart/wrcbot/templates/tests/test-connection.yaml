@@ -13,10 +13,3 @@ spec:
       image: busybox
       command: ['wget']
       args: ['{{ include "wrcbot.fullname" . }}:{{ .Values.service.port }}']
-    - name: vault-test
-      image: vault:1.15.2
-      env:
-        - name: VAULT_ADDR
-          value: "http://vault:8200"
-      command: ['vault']
-      args: ['status']

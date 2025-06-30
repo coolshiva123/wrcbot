@@ -24,18 +24,8 @@
 4. Run tests:
   helm test {{ .Release.Name }} --namespace {{ .Release.Namespace }}
 
-{{- if .Values.vault.enabled }}
-
-5. Vault Configuration:
-  The bot is configured to use Vault for secrets management.
-  Secrets path: {{ .Values.vault.secretPath }}
-  
-  To verify Vault integration:
-  kubectl exec --namespace {{ .Release.Namespace }} deployment/{{ include "wrcbot.fullname" . }} -- env | grep -E "(BOT_TOKEN|ADMIN_USERS)"
-
-{{- end }}
-
 🤖 Your WRC Bot is now deployed and ready to serve!
 
 For troubleshooting, check the README.md file or run:
+  kubectl describe pod --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "wrcbot.name" . }}"
   helm status {{ .Release.Name }} --namespace {{ .Release.Namespace }}
