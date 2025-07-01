@@ -24,6 +24,7 @@ FROM python:3.11-alpine
 RUN apk add --no-cache \
     libffi \
     openssl \
+    curl \
     && addgroup -g 1000 errbot \
     && adduser -D -u 1000 -G errbot errbot
 
