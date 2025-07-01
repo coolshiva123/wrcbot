@@ -48,6 +48,10 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /errbot/src/config.py
+              subPath: config.py
           {{- if not .Values.bot.disableHealthChecks }}
           livenessProbe:
             httpGet:
@@ -76,3 +80,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "wrcbot.fullname" . }}-config
