@@ -25,6 +25,7 @@ RUN apk add --no-cache \
     libffi \
     openssl \
     curl \
+    jq \
     && addgroup -g 1000 errbot \
     && adduser -D -u 1000 -G errbot errbot
 
