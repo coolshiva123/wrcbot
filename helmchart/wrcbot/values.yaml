@@ -65,3 +65,18 @@ bot:
     # BOT_TOKEN: "your-bot-token"
     # ADMIN_USERS: "@user1,@user2"
     BOT_DEBUG: "true"
+  config:
+    config.py: |
+      BACKEND='SlackV3'
+      BOT_DATA_DIR = '/errbot/data'
+      BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
+      BOT_LOG_FILE = '/errbot/errbot.log'
+      BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
+      BOT_LOG_LEVEL = 'DEBUG'
+      BOT_ADMINS = ()  # Will come from Vault
+      BOT_IDENTITY = {
+          'token': '',   # Will come from Vault
+          'signing_secret': '',  # Will come from Vault
+          'app_token': ''  # Will come from Vault
+      }
+      BOT_PREFIX = '<>'  # Will co your bot's user ID
