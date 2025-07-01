@@ -18,6 +18,7 @@ spec:
       labels:
         {{- include "wrcbot.selectorLabels" . | nindent 8 }}
     spec:
+      serviceAccountName: wrcbot-sa
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
