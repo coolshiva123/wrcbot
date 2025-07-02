@@ -90,39 +90,6 @@ spec:
           limits:
             cpu: "200m"
             memory: "256Mi"
-      - name: vault-init
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 100
-          capabilities:
-            drop:
-              - ALL
-        command:
-        - /bin/sh
-        - -c
-        - |
-          export VAULT_ADDR=http://127.0.0.1:8200
-          export VAULT_SKIP_VERIFY=true
-          /scripts/init.sh
-        volumeMounts:
-        - name: vault-init-script
-          mountPath: /scripts
-        - name: tools-bin
-          mountPath: /usr/local/bin
-        env:
-        - name: VAULT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: vault-keys
-              key: root-token
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
-          limits:
-            cpu: "200m"
-            memory: "256Mi"
       containers:
       - name: vault
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -209,6 +176,15 @@ spec:
                   UNSEAL_KEY=$(kubectl get secret -n wrcbot vault-keys -o jsonpath='{.data.unseal-key}' | base64 -d)
                   vault operator unseal "$UNSEAL_KEY"
                 fi
+                
+                # Wait for Vault to be unsealed
+                until vault status -format=json 2>/dev/null | grep -q '"sealed":false'; do
+                  echo "Waiting for Vault to be unsealed..."
+                  sleep 2
+                done
+                
+                # Run init script
+                /scripts/init.sh
         readinessProbe:
           httpGet:
             path: /v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200
