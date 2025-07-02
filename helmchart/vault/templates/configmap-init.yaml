@@ -20,6 +20,12 @@ data:
     done
 
     echo "Vault is unsealed. Configuring auth methods..."
+    
+    # Login with root token
+    vault login $VAULT_TOKEN || {
+      echo "Failed to login with root token"
+      exit 1
+    }
 
     # Enable kubernetes auth method if not already enabled
     vault auth list | grep -q '^kubernetes/' || {
