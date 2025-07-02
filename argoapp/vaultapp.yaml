@@ -21,3 +21,14 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - Replace=true
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+      name: vault-auth-delegator
+      jsonPointers:
+        - /metadata/annotations
+        - /metadata/labels

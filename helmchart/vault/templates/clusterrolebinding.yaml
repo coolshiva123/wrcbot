@@ -4,7 +4,7 @@ kind: ClusterRole
 metadata:
   name: {{ .Values.rbac.roleName }}
   annotations:
-    argocd.argoproj.io/sync-options: PruneLast=true
+    argocd.argoproj.io/sync-options: PruneLast=true,Replace=true
     argocd.argoproj.io/sync-wave: "-2"  # Ensure RBAC is created before Vault
   labels:
     app.kubernetes.io/name: {{ include "vault.name" . }}
@@ -28,10 +28,8 @@ kind: ClusterRoleBinding
 metadata:
   name: {{ .Values.rbac.roleName }}
   annotations:
-    argocd.argoproj.io/sync-options: PruneLast=true
+    argocd.argoproj.io/sync-options: PruneLast=true,Replace=true
     argocd.argoproj.io/sync-wave: "-2"  # Ensure RBAC is created before Vault
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
   labels:
     app.kubernetes.io/name: {{ include "vault.name" . }}
     helm.sh/chart: {{ include "vault.chart" . }}
