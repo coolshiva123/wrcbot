@@ -71,7 +71,10 @@ spec:
         - name: VAULT_ADDR
           value: "http://127.0.0.1:8200"
         - name: VAULT_TOKEN
-          value: "{{ .Values.vault.rootToken }}"
+          valueFrom:
+            secretKeyRef:
+              name: vault-keys
+              key: root-token
         - name: VAULT_LOG_LEVEL
           value: "debug"
         volumeMounts:
