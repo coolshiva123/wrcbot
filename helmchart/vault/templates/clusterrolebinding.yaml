@@ -1,16 +1,9 @@
-{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Values.rbac.roleName }}
-  annotations:
-    argocd.argoproj.io/sync-options: PruneLast=true,Replace=true
+  name: vault-server
   labels:
-    app.kubernetes.io/name: {{ include "vault.name" . }}
-    helm.sh/chart: {{ include "vault.chart" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/part-of: vault
+    {{- include "vault.labels" . | nindent 4 }}
 rules:
 - apiGroups: [""]
   resources: ["serviceaccounts", "pods"]
@@ -25,21 +18,29 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Values.rbac.roleName }}
-  annotations:
-    argocd.argoproj.io/sync-options: PruneLast=true,Replace=true
+  name: vault-server
   labels:
-    app.kubernetes.io/name: {{ include "vault.name" . }}
-    helm.sh/chart: {{ include "vault.chart" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/part-of: vault
+    {{- include "vault.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Values.rbac.roleName }}
+  name: vault-server
 subjects:
 - kind: ServiceAccount
-  name: {{ .Values.serviceAccount.name }}
+  name: vault-sa
   namespace: {{ .Release.Namespace }}
-{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-auth-delegator
+  labels:
+    {{- include "vault.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: vault-sa
+  namespace: {{ .Release.Namespace }}
