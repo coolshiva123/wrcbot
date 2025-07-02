@@ -1,7 +1,13 @@
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: vault-auth-delegator
+  name: {{ .Values.rbac.roleName }}
+  labels:
+    app.kubernetes.io/name: {{ include "vault.name" . }}
+    helm.sh/chart: {{ include "vault.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 rules:
 - apiGroups: [""]
   resources: ["serviceaccounts", "pods"]
@@ -16,12 +22,18 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: vault-auth-delegator
+  name: {{ .Values.rbac.roleName }}
+  labels:
+    app.kubernetes.io/name: {{ include "vault.name" . }}
+    helm.sh/chart: {{ include "vault.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: vault-auth-delegator
+  name: {{ .Values.rbac.roleName }}
 subjects:
 - kind: ServiceAccount
-  name: default  # Change to your Vault service account if not default
+  name: {{ .Values.serviceAccount.name }}
   namespace: {{ .Release.Namespace }}
+{{- end }}
