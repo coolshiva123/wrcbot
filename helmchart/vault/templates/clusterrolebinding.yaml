@@ -30,6 +30,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: PruneLast=true
     argocd.argoproj.io/sync-wave: "-2"  # Ensure RBAC is created before Vault
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
   labels:
     app.kubernetes.io/name: {{ include "vault.name" . }}
     helm.sh/chart: {{ include "vault.chart" . }}

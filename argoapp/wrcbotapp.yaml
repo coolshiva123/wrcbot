@@ -23,11 +23,19 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - RespectIgnoreDifferences=true
   ignoreDifferences:
     - group: apps
       kind: Deployment
       jsonPointers:
         - /spec/template/spec/containers/0/env
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+      name: vault-auth-delegator
+      jsonPointers:
+        - /metadata
+        - /roleRef
+        - /subjects
   dependencies:
     - name: vault
       namespace: wrcbot

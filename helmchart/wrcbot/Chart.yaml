@@ -14,11 +14,8 @@ sources:
 maintainers:
   - name: WRC Team
     email: team@wrc.com
-dependencies:
-  - name: vault
-    version: "0.1.0"
-    repository: "file://../vault"
-    condition: vault.enabled
+# No direct dependencies - Vault is deployed separately
+# dependencies:
 #     condition: redis.enabled
 #   - name: rabbitmq
 #     version: "^1.0.0"
