@@ -54,6 +54,8 @@ spec:
           value: "http://0.0.0.0:8200"
         - name: VAULT_CLUSTER_ADDR
           value: "http://0.0.0.0:8201"
+        - name: VAULT_LOG_LEVEL
+          value: debug
         command:
         - vault
         args:

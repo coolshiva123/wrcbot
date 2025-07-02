@@ -74,8 +74,37 @@ kubectl get secret -n wrcbot | grep wrcbot-sa
 kubectl describe secret <secret-name> -n wrcbot
 
 kubectl get serviceaccount wrcbot-sa -n wrcbot -o yaml
-kubectl get secret -n wrcbot | grep wrcbot-sa empty output
+kubectl get secret -n wrcbot | grep wrcbot-sa
+
+The Helm chart for `wrcbot` currently defines only the `wrcbot-sa` service account in serviceaccount.yaml. There is no `wrcbot-sa-token.yaml` or equivalent secret manifest present.
+
+In Kubernetes v1.24+, service account tokens are not created as secrets by default. To ensure your pod gets a token for Vault authentication, you should add a secret of type `kubernetes.io/service-account-token` and bind it to `wrcbot-sa`.
+
+Would you like me to provide a Helm template for this secret so you can add it to your chart?
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wrcbot-sa-token
+  namespace: wrcbot
+  annotations:
+    kubernetes.io/service-account.name: wrcbot-sa
+type: kubernetes.io/service-account-token
+
+kubectl apply 
+
+kubectl get secret -n wrcbot | grep wrcbot-sa
+kubectl describe secret wrcbot-sa-token -n wrcbot
 
 
+Verify Secrets fetch from vault
 
+kubectl get pod wrcbot-7b9674c8bf-vm24z -n wrcbot -o jsonpath="{.spec.serviceAccountName}"
+kubectl get pod wrcbot-7b9674c8bf-vm24z -n wrcbot -o json | jq -r '.spec.serviceAccountName'
+kubectl get secret wrcbot-sa-token -n wrcbot -o jsonpath="{.data.token}" | base64 -d
+curl --request POST \
+  --data '{"role": "wrcbot-role", "jwt": "<JWT_TOKEN>"}' \
+  http://vault.wrcbot.svc.cluster.local:8200/v1/auth/kubernetes/login
 
+curl -H "X-Vault-Token: <VAULT_CLIENT_TOKEN>" \
+     https://vault.wrcbot.svc.cluster.local:8200/v1/secret/data/wrcbot/config
