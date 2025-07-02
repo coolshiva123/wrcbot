@@ -5,13 +5,12 @@ metadata:
   name: {{ .Values.rbac.roleName }}
   annotations:
     argocd.argoproj.io/sync-options: PruneLast=true,Replace=true
-    argocd.argoproj.io/sync-wave: "-2"  # Ensure RBAC is created before Vault
   labels:
     app.kubernetes.io/name: {{ include "vault.name" . }}
     helm.sh/chart: {{ include "vault.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/part-of: vault  # Explicitly mark as part of Vault
+    app.kubernetes.io/part-of: vault
 rules:
 - apiGroups: [""]
   resources: ["serviceaccounts", "pods"]
@@ -29,13 +28,12 @@ metadata:
   name: {{ .Values.rbac.roleName }}
   annotations:
     argocd.argoproj.io/sync-options: PruneLast=true,Replace=true
-    argocd.argoproj.io/sync-wave: "-2"  # Ensure RBAC is created before Vault
   labels:
     app.kubernetes.io/name: {{ include "vault.name" . }}
     helm.sh/chart: {{ include "vault.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/part-of: vault  # Explicitly mark as part of Vault
+    app.kubernetes.io/part-of: vault
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

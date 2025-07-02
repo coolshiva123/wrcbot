@@ -3,8 +3,6 @@ kind: Application
 metadata:
   name: wrcbot
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"  # Higher number, runs after Vault
 spec:
   project: wrcbot
   source:
@@ -36,6 +34,3 @@ spec:
         - /metadata
         - /roleRef
         - /subjects
-  dependencies:
-    - name: vault
-      namespace: wrcbot
