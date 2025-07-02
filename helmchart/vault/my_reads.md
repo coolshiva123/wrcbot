@@ -108,3 +108,8 @@ curl --request POST \
 
 curl -H "X-Vault-Token: <VAULT_CLIENT_TOKEN>" \
      https://vault.wrcbot.svc.cluster.local:8200/v1/secret/data/wrcbot/config
+
+
+Vault check to k8s 
+
+kubectl exec -it vault-5dc49c799-mqbmj -n wrcbot -- curl -k https://kubernetes.default.svc.cluster.local:443
