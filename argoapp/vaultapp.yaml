@@ -6,6 +6,19 @@ metadata:
 spec:
   project: wrcbot
   source:
+    chart: vault
+    repoURL: https://helm.releases.hashicorp.com
+    targetRevision: 0.25.0  # Latest stable version
+    helm:
+      valueFiles:
+        - vault-official-values.yaml argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+spec:
+  project: wrcbot
+  source:
     repoURL: 'https://github.com/coolshiva123/wrcbot.git'
     targetRevision: HEAD
     path: helmchart/vault
