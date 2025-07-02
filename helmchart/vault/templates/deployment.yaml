@@ -91,11 +91,30 @@ spec:
         - name: vault-storage
           mountPath: /vault/file
         readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - vault status -format=json | grep -q '"initialized":true' && vault status -format=json | grep -q '"sealed":false'
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
           httpGet:
             path: /v1/sys/health
             port: 8200
             scheme: HTTP
           initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: /v1/sys/health
+            port: 8200
+            scheme: HTTP
+          initialDelaySeconds: 60
           periodSeconds: 5
       volumes:
       - name: vault-storage
