@@ -10,6 +10,13 @@ if ! kubectl get deployment vault -n wrcbot &>/dev/null; then
     exit 1
 fi
 
+# Wait for vault pod to be ready
+echo "⌛ Waiting for Vault pod to be ready..."
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vault -n wrcbot --timeout=60s || {
+    echo "❌ Timeout waiting for Vault pod to be ready"
+    exit 1
+}
+
 # Check vault status
 echo "📊 Checking Vault status..."
 VAULT_STATUS=$(kubectl exec deployment/vault -n wrcbot -- vault status 2>/dev/null || echo "Failed to get status")

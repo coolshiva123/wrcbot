@@ -45,6 +45,21 @@ if kubectl exec deployment/vault -n wrcbot -- vault status 2>/dev/null | grep -q
     exit 0
 fi
 
+# Function to check vault-init logs
+check_init_status() {
+    echo "📋 Checking vault-init container status..."
+    INIT_LOGS=$(kubectl logs -n wrcbot -l app.kubernetes.io/name=vault -c vault-init --tail=50)
+    if echo "$INIT_LOGS" | grep -q "Vault configuration completed successfully"; then
+        echo "✅ Vault initialization completed successfully"
+        return 0
+    else
+        echo "⏳ Vault initialization still in progress..."
+        echo "Recent logs from vault-init container:"
+        echo "$INIT_LOGS"
+        return 1
+    fi
+}
+
 # Get unseal key from secret
 echo "🔑 Retrieving unseal key..."
 UNSEAL_KEY=$(kubectl get secret vault-keys -n wrcbot -o jsonpath='{.data.unseal-key}' 2>/dev/null | base64 -d)
@@ -66,12 +81,29 @@ fi
 
 # Unseal vault
 echo "🔓 Unsealing Vault..."
-if kubectl exec deployment/vault -n wrcbot -- vault operator unseal "$UNSEAL_KEY" 2>/dev/null; then
-    echo "✅ Vault successfully unsealed!"
-    
-    # Verify status
-    echo "📊 Final status:"
-    kubectl exec deployment/vault -n wrcbot -- vault status 2>/dev/null || true
+if ! kubectl exec deployment/vault -n wrcbot -- vault operator unseal "$UNSEAL_KEY" 2>/dev/null; then
+    echo "❌ Failed to unseal Vault"
+    exit 1
+fi
+echo "✅ Vault successfully unsealed!"
+
+# Wait for vault-init to complete
+echo "⌛ Waiting for vault-init to complete..."
+RETRIES=0
+while ! check_init_status && [ $RETRIES -lt 12 ]; do
+    echo "⏳ Waiting 5 seconds before checking again..."
+    sleep 5
+    RETRIES=$((RETRIES + 1))
+done
+
+if [ $RETRIES -eq 12 ]; then
+    echo "❌ Timeout waiting for vault-init to complete"
+    exit 1
+fi
+
+# Verify status
+echo "📊 Final status:"
+kubectl exec deployment/vault -n wrcbot -- vault status 2>/dev/null || true
     
     # Show UI access info if token requested
     if [ "$SHOW_TOKEN" = true ]; then
