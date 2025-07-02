@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wrcbot.fullname" . }}-config
+  labels:
+    {{- include "wrcbot.labels" . | nindent 4 }}
+data:
+  # Bot configuration that doesn't contain secrets
+  {{- if .Values.bot.config }}
+  {{- toYaml .Values.bot.config | nindent 2 }}
+  {{- end }}
+  # Default configuration
+  log_level: "INFO"
+  plugin_dir: "/app/plugins"
+  data_dir: "/tmp/data"

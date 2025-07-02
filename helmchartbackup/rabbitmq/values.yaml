@@ -1,0 +1,13 @@
+replicaCount: 1
+
+image:
+  repository: rabbitmq
+  tag: "3.13.1-management"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  amqpPort: 5672
+  managementPort: 15672
+
+resources: {}

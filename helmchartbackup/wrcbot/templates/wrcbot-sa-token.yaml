@@ -1,0 +1,12 @@
+{{- if and .Values.serviceAccount.create .Values.serviceAccount.createToken -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.serviceAccount.tokenName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wrcbot.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/service-account.name: {{ .Values.serviceAccount.name }}
+type: kubernetes.io/service-account-token
+{{- end }}

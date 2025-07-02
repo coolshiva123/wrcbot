@@ -1,0 +1,56 @@
+server:
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+      disable_mlock = true
+      
+      storage "file" {
+        path = "/vault/data"
+      }
+      
+      listener "tcp" {
+        address = "0.0.0.0:8200"
+        tls_disable = 1
+      }
+  
+  service:
+    enabled: true
+  
+  dataStorage:
+    enabled: true
+    size: 1Gi
+    storageClass: null
+    accessMode: ReadWriteOnce
+  
+  # No TLS for dev/test
+  dev:
+    enabled: false
+  
+  # No HA
+  ha:
+    enabled: false
+  
+  # Automatically initialize and unseal
+  postStart:
+    - /bin/sh
+    - -c
+    - |
+      sleep 5
+      if ! vault status -format=json 2>/dev/null | grep -q '"initialized":true'; then
+        vault operator init -key-shares=1 -key-threshold=1 -format=json > /tmp/vault-init.json
+        UNSEAL_KEY=$(jq -r '.unseal_keys_b64[0]' /tmp/vault-init.json)
+        ROOT_TOKEN=$(jq -r '.root_token' /tmp/vault-init.json)
+        kubectl create secret generic vault-keys \
+          --from-literal=unseal-key="$UNSEAL_KEY" \
+          --from-literal=root-token="$ROOT_TOKEN" \
+          -n wrcbot || true
+      fi
+      
+      if vault status -format=json 2>/dev/null | grep -q '"sealed":true'; then
+        UNSEAL_KEY=$(kubectl get secret -n wrcbot vault-keys -o jsonpath='{.data.unseal-key}' | base64 -d)
+        vault operator unseal "$UNSEAL_KEY"
+      fi
+
+injector:
+  enabled: false  # We don't need the injector for this use case

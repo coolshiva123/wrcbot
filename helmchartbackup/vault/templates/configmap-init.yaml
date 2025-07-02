@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-init-script
+data:
+  init.sh: |
+    #!/bin/sh
+    set -e
+
+    if [ -f "/tmp/vault-init.complete" ]; then
+      echo "Initialization already completed"
+      exit 0
+    fi
+
+    # Helper function for checking readiness
+    wait_for_vault() {
+      local max_attempts=60
+      local attempt=1
+
+      while [ $attempt -le $max_attempts ]; do
+        if vault status -format=json 2>/dev/null | grep -q '"initialized":true' && \
+           vault status -format=json 2>/dev/null | grep -q '"sealed":false'; then
+          return 0
+        fi
+        echo "Waiting for Vault to be initialized and unsealed (attempt $attempt/$max_attempts)..."
+        sleep 2
+        attempt=$((attempt + 1))
+      done
+
+      return 1
+    }
+
+    # Wait for Vault to become ready
+    wait_for_vault || {
+      echo "Vault did not become ready in time"
+      exit 1
+    }
+
+    # Login with root token
+    vault login "$VAULT_TOKEN" || {
+      echo "Failed to login with root token"
+      exit 1
+    }
+
+    # Enable Kubernetes auth method
+    if ! vault auth list | grep -q '^kubernetes/'; then
+      echo "Enabling Kubernetes auth method..."
+      vault auth enable kubernetes || {
+        echo "Failed to enable Kubernetes auth method"
+        exit 1
+      }
+    fi
+
+    # Configure Kubernetes auth
+    echo "Configuring Kubernetes auth..."
+    TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt > /tmp/k8s-ca.crt
+
+    vault write auth/kubernetes/config \
+      kubernetes_host="https://kubernetes.default.svc.cluster.local:443" \
+      kubernetes_ca_cert=@/tmp/k8s-ca.crt \
+      token_reviewer_jwt="$TOKEN" \
+      disable_local_ca_jwt=false || {
+      echo "Failed to configure Kubernetes auth"
+      exit 1
+    }
+
+    # Configure policy
+    echo 'path "secret/data/wrcbot/config" { capabilities = ["read"] }' | \
+    vault policy write wrcbot-policy - || {
+      echo "Failed to configure policy"
+      exit 1
+    }
+
+    # Configure role
+    vault write auth/kubernetes/role/wrcbot-role \
+      bound_service_account_names=wrcbot-sa \
+      bound_service_account_namespaces=wrcbot \
+      policies=wrcbot-policy \
+      ttl=1h || {
+      echo "Failed to configure role"
+      exit 1
+    }
+
+    touch /tmp/vault-init.complete
+    echo "Vault configuration completed successfully!"
+    exit 0
