@@ -14,7 +14,7 @@ data:
     done
 
     # Check if Vault is unsealed
-    until [ "$(vault status --format=json | jq -r '.sealed')" = "false" ]; do
+    until vault status 2>/dev/null | grep -q "Sealed.*false"; do
       echo "Waiting for Vault to be unsealed..."
       sleep 5
     done
