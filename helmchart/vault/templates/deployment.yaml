@@ -33,19 +33,23 @@ spec:
         - name: vault-storage
           mountPath: /vault/file
       - name: vault-tools-init
-        image: bitnami/kubectl:latest
+        image: alpine:3.18
         securityContext:
-          runAsNonRoot: true
-          runAsUser: 1001
+          runAsNonRoot: false
+          runAsUser: 0
         command:
         - /bin/sh
         - -c
         - |
           mkdir -p /tools/usr/local/bin
-          # Copy kubectl
-          cp /opt/bitnami/kubectl/bin/kubectl /tools/usr/local/bin/
-          # Download and install jq
-          curl -L -o /tools/usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+          # Install kubectl and curl
+          apk add --no-cache curl jq
+          # Download kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          mv kubectl /tools/usr/local/bin/
+          # Copy jq
+          cp $(which jq) /tools/usr/local/bin/
+          # Set permissions
           chmod +x /tools/usr/local/bin/*
         volumeMounts:
         - name: tools-bin
