@@ -13,7 +13,6 @@ spec:
   resources:
     requests:
       storage: {{ .Values.storage.size }}
-  storageClassName: "" # Empty string for immediate binding to existing PV
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -21,6 +20,9 @@ metadata:
   name: vault-pv
   labels:
     {{- include "vault.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/resource-policy": keep
+    "pv.kubernetes.io/bound-by-controller": "yes"
 spec:
   capacity:
     storage: {{ .Values.storage.size }}
