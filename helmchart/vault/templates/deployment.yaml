@@ -41,16 +41,15 @@ spec:
         - /bin/sh
         - -c
         - |
-          mkdir -p /tools/usr/local/bin
-          # Install kubectl and curl
+          # Install required tools
           apk add --no-cache curl jq
           # Download kubectl
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          mv kubectl /tools/usr/local/bin/
+          chmod +x kubectl
+          mv kubectl /tools/kubectl
           # Copy jq
-          cp $(which jq) /tools/usr/local/bin/
-          # Set permissions
-          chmod +x /tools/usr/local/bin/*
+          cp $(which jq) /tools/jq
+          chmod +x /tools/jq
         volumeMounts:
         - name: tools-bin
           mountPath: /tools
@@ -130,14 +129,18 @@ spec:
         volumeMounts:
         - name: vault-config
           mountPath: /vault/config
-        - name: tools-bin
-          mountPath: /usr/local/bin
         - name: vault-storage
           mountPath: /vault/file
         - name: vault-token
           mountPath: /home/vault/.vault-token
         - name: vault-init-script
           mountPath: /scripts
+        - name: tools-bin
+          mountPath: /usr/local/bin/kubectl
+          subPath: kubectl
+        - name: tools-bin
+          mountPath: /usr/local/bin/jq
+          subPath: jq
         lifecycle:
           postStart:
             exec:
