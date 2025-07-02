@@ -42,10 +42,7 @@ data:
       exit 1
     }
 
-      exit 1
-    }
-
-    # Enable Kubernetes auth method
+# Enable Kubernetes auth method
     if ! vault auth list | grep -q '^kubernetes/'; then
       echo "Enabling Kubernetes auth method..."
       vault auth enable kubernetes || {
