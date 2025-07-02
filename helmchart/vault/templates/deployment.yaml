@@ -79,18 +79,13 @@ spec:
           mountPath: /scripts
         - name: vault-config
           mountPath: /vault/config
-        securityContext:
-          capabilities:
-            add: ["IPC_LOCK"]
-        {{- if .Values.resources }}
         resources:
-          {{- toYaml .Values.resources | nindent 10 }}
-        {{- end }}
-        volumeMounts:
-        - name: vault-storage
-          mountPath: /vault/file
-        - name: vault-config
-          mountPath: /vault/config
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
       volumes:
       - name: vault-storage
         persistentVolumeClaim:
