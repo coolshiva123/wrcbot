@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: wrcbot
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # Higher number, runs after Vault
 spec:
   project: wrcbot
   source:
@@ -21,3 +23,11 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/env
+  dependencies:
+    - name: vault
+      namespace: wrcbot

@@ -14,10 +14,11 @@ sources:
 maintainers:
   - name: WRC Team
     email: team@wrc.com
-# dependencies:
-#   - name: redis
-#     version: "^1.0.0"
-#     repository: "file://../redis"
+dependencies:
+  - name: vault
+    version: "0.1.0"
+    repository: "file://../vault"
+    condition: vault.enabled
 #     condition: redis.enabled
 #   - name: rabbitmq
 #     version: "^1.0.0"
