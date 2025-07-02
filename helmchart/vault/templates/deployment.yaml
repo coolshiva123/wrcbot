@@ -54,35 +54,6 @@ spec:
           limits:
             cpu: "200m"
             memory: "256Mi"
-      - name: vault-init
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 100
-          capabilities:
-            drop:
-              - ALL
-        command: ["/bin/sh", "/scripts/init.sh"]
-        env:
-        - name: VAULT_ADDR
-          value: "http://127.0.0.1:8200"
-        - name: VAULT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: vault-keys
-              key: root-token
-        volumeMounts:
-        - name: vault-init-script
-          mountPath: /scripts
-        - name: vault-token
-          mountPath: /home/vault/.vault-token
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
-          limits:
-            cpu: "200m"
-            memory: "256Mi"
       containers:
       - name: vault
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -115,6 +86,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        - name: VAULT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vault-keys
+              key: root-token
         volumeMounts:
         - name: vault-config
           mountPath: /vault/config
@@ -122,6 +98,21 @@ spec:
           mountPath: /vault/file
         - name: vault-token
           mountPath: /home/vault/.vault-token
+        - name: vault-init-script
+          mountPath: /scripts
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                export VAULT_ADDR=http://127.0.0.1:8200
+                until vault status >/dev/null 2>&1; do
+                  echo "Waiting for Vault to start..."
+                  sleep 2
+                done
+                /scripts/init.sh
         readinessProbe:
           exec:
             command:
