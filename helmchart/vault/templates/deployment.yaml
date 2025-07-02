@@ -47,6 +47,11 @@ spec:
         - name: cluster
           containerPort: 8201
           protocol: TCP
+        command:
+        - vault
+        args:
+        - server
+        - -config=/vault/config/vault.hcl
         env:
         - name: VAULT_API_ADDR
           value: "http://0.0.0.0:8200"
@@ -54,8 +59,11 @@ spec:
           value: "http://0.0.0.0:8201"
         - name: VAULT_LOG_LEVEL
           value: "debug"
-        - name: VAULT_TOKEN
-          value: "{{ .Values.vault.rootToken }}"  # This is needed for the init container
+        volumeMounts:
+        - name: vault-config
+          mountPath: /vault/config
+        - name: vault-storage
+          mountPath: /vault/file
       - name: vault-init
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         command: ["/bin/sh", "/scripts/init.sh"]
@@ -64,24 +72,13 @@ spec:
           value: "http://127.0.0.1:8200"
         - name: VAULT_TOKEN
           value: "{{ .Values.vault.rootToken }}"
+        - name: VAULT_LOG_LEVEL
+          value: "debug"
         volumeMounts:
         - name: vault-init-script
           mountPath: /scripts
         - name: vault-config
           mountPath: /vault/config
-        - name: VAULT_ADDR
-          value: "http://127.0.0.1:8200"
-        - name: VAULT_API_ADDR
-          value: "http://0.0.0.0:8200"
-        - name: VAULT_CLUSTER_ADDR
-          value: "http://0.0.0.0:8201"
-        - name: VAULT_LOG_LEVEL
-          value: debug
-        command:
-        - vault
-        args:
-        - server
-        - -config=/vault/config/vault.hcl
         securityContext:
           capabilities:
             add: ["IPC_LOCK"]
