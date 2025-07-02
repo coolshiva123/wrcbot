@@ -16,8 +16,22 @@ spec:
     spec:
       serviceAccountName: vault-sa
       securityContext:
-        fsGroup: 1000
+        fsGroup: 100
       initContainers:
+      - name: vault-storage-init
+        image: busybox
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          chown -R 100:100 /vault/file
+          chmod 750 /vault/file
+        volumeMounts:
+        - name: vault-storage
+          mountPath: /vault/file
       - name: vault-config-init
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         securityContext:
