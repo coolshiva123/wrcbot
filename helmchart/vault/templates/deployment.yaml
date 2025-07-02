@@ -38,16 +38,6 @@ spec:
         volumeMounts:
         - name: vault-config
           mountPath: /vault/config
-      - name: vault-init
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        command: ["/bin/sh", "/scripts/init.sh"]
-        env:
-        - name: VAULT_ADDR
-          value: "http://127.0.0.1:8200"
-        - name: VAULT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: vault-keys
               key: root-token
         - name: VAULT_LOG_LEVEL
           value: "debug"
@@ -91,38 +81,30 @@ spec:
         - name: vault-storage
           mountPath: /vault/file
         readinessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - vault status -format=json | grep -q '"initialized":true' && vault status -format=json | grep -q '"sealed":false'
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          failureThreshold: 3
-          successThreshold: 1
-        startupProbe:
           httpGet:
             path: /v1/sys/health
             port: 8200
             scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 5
-          failureThreshold: 30
-          successThreshold: 1
-        livenessProbe:
-          httpGet:
-            path: /v1/sys/health
-            port: 8200
-            scheme: HTTP
-          initialDelaySeconds: 60
-          periodSeconds: 5
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                until vault status >/dev/null 2>&1; do
+                  echo "Waiting for Vault to be ready..."
+                  sleep 2
+                done
+                /scripts/init.sh
       volumes:
       - name: vault-storage
         persistentVolumeClaim:
-          claimName: {{ include "vault.fullname" . }}-pvc
+          claimName: vault-pvc
       - name: vault-config
         emptyDir: {}
       - name: vault-init-script
         configMap:
           name: vault-init-script
-          defaultMode: 0755
