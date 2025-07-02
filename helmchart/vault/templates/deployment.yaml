@@ -48,6 +48,27 @@ spec:
           containerPort: 8201
           protocol: TCP
         env:
+        - name: VAULT_API_ADDR
+          value: "http://0.0.0.0:8200"
+        - name: VAULT_CLUSTER_ADDR
+          value: "http://0.0.0.0:8201"
+        - name: VAULT_LOG_LEVEL
+          value: "debug"
+        - name: VAULT_TOKEN
+          value: "{{ .Values.vault.rootToken }}"  # This is needed for the init container
+      - name: vault-init
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        command: ["/bin/sh", "/scripts/init.sh"]
+        env:
+        - name: VAULT_ADDR
+          value: "http://127.0.0.1:8200"
+        - name: VAULT_TOKEN
+          value: "{{ .Values.vault.rootToken }}"
+        volumeMounts:
+        - name: vault-init-script
+          mountPath: /scripts
+        - name: vault-config
+          mountPath: /vault/config
         - name: VAULT_ADDR
           value: "http://127.0.0.1:8200"
         - name: VAULT_API_ADDR
@@ -79,3 +100,7 @@ spec:
           claimName: {{ include "vault.fullname" . }}-pvc
       - name: vault-config
         emptyDir: {}
+      - name: vault-init-script
+        configMap:
+          name: vault-init-script
+          defaultMode: 0755
