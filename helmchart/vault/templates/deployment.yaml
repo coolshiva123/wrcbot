@@ -18,6 +18,21 @@ spec:
       securityContext:
         fsGroup: 100
       initContainers:
+      - name: vault-tools-init
+        image: bitnami/kubectl
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install jq
+          apt-get update && apt-get install -y jq
+          # Copy kubectl and jq to a shared volume
+          cp /opt/bitnami/kubectl/bin/kubectl /tools/kubectl
+          cp $(which jq) /tools/jq
+          chmod +x /tools/kubectl /tools/jq
+        volumeMounts:
+        - name: tools-bin
+          mountPath: /tools
       - name: vault-storage-init
         image: busybox
         securityContext:
@@ -114,6 +129,8 @@ spec:
           mountPath: /home/vault/.vault-token
         - name: vault-init-script
           mountPath: /scripts
+        - name: tools-bin
+          mountPath: /usr/local/bin
         lifecycle:
           postStart:
             exec:
@@ -133,10 +150,10 @@ spec:
                   vault operator init -key-shares=1 -key-threshold=1 -format=json > /tmp/vault-init.json
                   
                   # Store keys in Kubernetes secret
-                  UNSEAL_KEY=$(jq -r '.unseal_keys_b64[0]' /tmp/vault-init.json)
-                  ROOT_TOKEN=$(jq -r '.root_token' /tmp/vault-init.json)
+                  UNSEAL_KEY=$(/usr/local/bin/jq -r '.unseal_keys_b64[0]' /tmp/vault-init.json)
+                  ROOT_TOKEN=$(/usr/local/bin/jq -r '.root_token' /tmp/vault-init.json)
                   
-                  kubectl create secret generic vault-keys \
+                  /usr/local/bin/kubectl create secret generic vault-keys \
                     --from-literal=unseal-key="$UNSEAL_KEY" \
                     --from-literal=root-token="$ROOT_TOKEN" \
                     -n wrcbot
@@ -145,7 +162,7 @@ spec:
                 # Unseal if needed
                 if vault status -format=json 2>/dev/null | grep -q '"sealed":true'; then
                   echo "Unsealing Vault..."
-                  UNSEAL_KEY=$(kubectl get secret -n wrcbot vault-keys -o jsonpath='{.data.unseal-key}' | base64 -d)
+                  UNSEAL_KEY=$(/usr/local/bin/kubectl get secret -n wrcbot vault-keys -o jsonpath='{.data.unseal-key}' | base64 -d)
                   vault operator unseal "$UNSEAL_KEY"
                 fi
                 
@@ -179,3 +196,5 @@ spec:
       - name: vault-token
         emptyDir:
           medium: Memory
+      - name: tools-bin
+        emptyDir: {}
