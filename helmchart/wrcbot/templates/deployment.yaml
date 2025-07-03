@@ -18,17 +18,17 @@ spec:
         vault.hashicorp.com/agent-inject-secret-config.py: 'secret/wrcbot-config'
         vault.hashicorp.com/agent-inject-file-config.py: '/config-py/config.py'
         vault.hashicorp.com/agent-inject-template-config.py: |-
-          {{`{{- with secret "secret/wrcbot-config" -}}
+          {{ `{{- with secret "secret/wrcbot-config" }}
           BACKEND = 'SlackV3'
           BOT_DATA_DIR = '/errbot/data'
           BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
           BOT_LOG_FILE = '/errbot/errbot.log'
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
-          BOT_ADMINS = {{.Data.data.config | fromJSON | index "BOT_ADMINS"}}
-          BOT_IDENTITY = {{.Data.data.config | fromJSON | index "BOT_IDENTITY"}}
-          BOT_PREFIX = '{{.Data.data.config | fromJSON | index "BOT_PREFIX"}}'
-          {{- end }}`}}
+          BOT_ADMINS = {{ .Data.config | toJSON }}
+          BOT_IDENTITY = {{ .Data.config | parseJSON | index "BOT_IDENTITY" | toJSON }}
+          BOT_PREFIX = {{ .Data.config | parseJSON | index "BOT_PREFIX" | toJSON }}
+          {{- end }}` }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
