@@ -28,19 +28,19 @@ spec:
           BOT_LOG_LEVEL = 'DEBUG'
           {{ "{{" }}- with secret "secret/data/wrcbot-config" }}
           {{ "{{" }}- with .Data.data }}
-          {{ "{{" }} $config := .config | parseJSON }}
+          {{ "{{" }} $cfg := .config | parseJSON }}
           BOT_ADMINS = (
-          {{- range $i, $e := $config.BOT_ADMINS -}}
+          {{- "${cfg.BOT_ADMINS}" | range $i, $e := . -}}
             {{- if $i }}, {{ end -}}
-            "{{ $e }}"
+            "{{ "${e}" }}"
           {{- end -}}
           ,)
           BOT_IDENTITY = {
-              'token': '{{ $config.BOT_IDENTITY.token }}',
-              'signing_secret': '{{ $config.BOT_IDENTITY.signing_secret }}',
-              'app_token': '{{ $config.BOT_IDENTITY.app_token }}'
+              'token': '{{ "${cfg.BOT_IDENTITY.token}" }}',
+              'signing_secret': '{{ "${cfg.BOT_IDENTITY.signing_secret}" }}',
+              'app_token': '{{ "${cfg.BOT_IDENTITY.app_token}" }}'
           }
-          BOT_PREFIX = '{{ $config.BOT_PREFIX }}'
+          BOT_PREFIX = '{{ "${cfg.BOT_PREFIX}" }}'
           {{ "{{" }}- end }}
           {{ "{{" }}- end }}
       {{- with .Values.podAnnotations }}
