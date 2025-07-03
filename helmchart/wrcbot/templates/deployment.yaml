@@ -35,38 +35,78 @@ spec:
             - sh
             - -c
             - >-
-              set -e;
+              set -x;
+              echo "Starting vault-init container...";
+              
+              echo "Installing required packages...";
               apk add --no-cache jq;
-              VAULT_ADDR="http://vault:8200";
+              
+              VAULT_ADDR="http://vault.wrcbot.svc.cluster.local:8200";
               SECRET_PATH="secret/wrcbot-config";
               ROLE="wrcbot-role";
               CONFIG_PATH="/config/config.py";
+              
+              echo "Waiting for Vault to be ready...";
+              until curl -fs ${VAULT_ADDR}/v1/sys/health; do
+                echo "Vault is not ready - sleeping 5s...";
+                sleep 5;
+              done;
+              
               echo "Reading service account token...";
+              if [ ! -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
+                echo "Error: Service account token file not found";
+                ls -la /var/run/secrets/kubernetes.io/;
+                exit 1;
+              fi;
+              
               JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token);
               if [ -z "$JWT" ]; then
                 echo "Error: Failed to read service account token";
                 exit 1;
               fi;
               echo "Authenticating with Vault...";
-              VAULT_LOGIN_RESPONSE=$(curl -s --fail --request POST --data "{\"role\": \"${ROLE}\", \"jwt\": \"${JWT}\"}" ${VAULT_ADDR}/v1/auth/kubernetes/login);
-              if [ $? -ne 0 ]; then
-                echo "Error: Failed to authenticate with Vault";
+              VAULT_LOGIN_RESPONSE=$(curl -v --fail --request POST \
+                --data "{\"role\": \"${ROLE}\", \"jwt\": \"${JWT}\"}" \
+                ${VAULT_ADDR}/v1/auth/kubernetes/login 2>&1);
+              LOGIN_STATUS=$?;
+              echo "Vault login response: $VAULT_LOGIN_RESPONSE";
+              
+              if [ $LOGIN_STATUS -ne 0 ]; then
+                echo "Error: Failed to authenticate with Vault. Status: $LOGIN_STATUS";
+                echo "Full response: $VAULT_LOGIN_RESPONSE";
                 exit 1;
               fi;
-              VAULT_TOKEN=$(echo "$VAULT_LOGIN_RESPONSE" | jq -r .auth.client_token);
-              if [ -z "$VAULT_TOKEN" ] || [ "$VAULT_TOKEN" = "null" ]; then
+              
+              VAULT_TOKEN=$(echo "$VAULT_LOGIN_RESPONSE" | grep -o '"client_token":"[^"]*' | cut -d'"' -f4);
+              if [ -z "$VAULT_TOKEN" ]; then
                 echo "Error: Failed to extract Vault token from response";
+                echo "Full response: $VAULT_LOGIN_RESPONSE";
                 exit 1;
               fi;
               echo "Fetching secret from Vault...";
-              SECRET_JSON=$(curl -s --fail --header "X-Vault-Token: ${VAULT_TOKEN}" ${VAULT_ADDR}/v1/${SECRET_PATH});
-              if [ $? -ne 0 ]; then
-                echo "Error: Failed to fetch secret from Vault";
+              SECRET_JSON=$(curl -v --fail \
+                --header "X-Vault-Token: ${VAULT_TOKEN}" \
+                ${VAULT_ADDR}/v1/${SECRET_PATH} 2>&1);
+              SECRET_STATUS=$?;
+              echo "Secret fetch response: $SECRET_JSON";
+              
+              if [ $SECRET_STATUS -ne 0 ]; then
+                echo "Error: Failed to fetch secret from Vault. Status: $SECRET_STATUS";
+                echo "Full response: $SECRET_JSON";
                 exit 1;
               fi;
-              CONFIG=$(echo "$SECRET_JSON" | jq -r .data.config);
-              if [ -z "$CONFIG" ] || [ "$CONFIG" = "null" ]; then
+              
+              # Try to extract config using different approaches
+              CONFIG=$(echo "$SECRET_JSON" | jq -r '.data.config // empty');
+              if [ -z "$CONFIG" ]; then
+                echo "Trying alternate data path...";
+                CONFIG=$(echo "$SECRET_JSON" | jq -r '.data // empty');
+              fi;
+              
+              if [ -z "$CONFIG" ]; then
                 echo "Error: Failed to extract config from secret";
+                echo "Raw secret JSON:";
+                echo "$SECRET_JSON" | jq '.';
                 exit 1;
               fi;
               echo "Generating config.py...";
