@@ -17,7 +17,9 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: "wrcbot-sa"
   # Annotations to add to the service account
-  annotations: {}
+  annotations:
+    # Add any annotations needed for Vault authentication
+    vault.hashicorp.com/role: "wrcbot-role"
 
 imagePullSecrets: []
 nameOverride: ""
