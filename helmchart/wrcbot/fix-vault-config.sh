@@ -14,9 +14,10 @@ kubectl exec -n wrcbot vault-0 -- vault policy write wrcbot-policy /tmp/policy.h
 rm policy.hcl
 
 # Update the Kubernetes auth role
+echo "Updating Kubernetes auth role..."
 kubectl exec -n wrcbot vault-0 -- vault write auth/kubernetes/role/wrcbot-role \
-    bound_service_account_names=wrcbot \
-    bound_service_account_namespaces=default \
+    bound_service_account_names=wrcbot-sa \
+    bound_service_account_namespaces=wrcbot \
     policies=wrcbot-policy \
     ttl=24h
 
