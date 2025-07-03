@@ -27,9 +27,11 @@ spec:
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
           {{ `{{ with secret "secret/wrcbot-config" }}` }}
-          BOT_ADMINS = {{ `{{ .Data.config | parseJSON | index "BOT_ADMINS" }}` }}
-          BOT_IDENTITY = {{ `{{ .Data.config | parseJSON | index "BOT_IDENTITY" | toJSON }}` }}
-          BOT_PREFIX = '{{ `{{ .Data.config | parseJSON | index "BOT_PREFIX" }}` }}'
+          {{ `{{ with .Data.config | parseJSON }}` }}
+          BOT_ADMINS = ('@awsterraform',)  # Hardcoded since it's a Python tuple
+          BOT_IDENTITY = {{ `{{ .BOT_IDENTITY | toJSON }}` }}
+          BOT_PREFIX = '{{ `{{ .BOT_PREFIX }}` }}'
+          {{ `{{ end }}` }}
           {{ `{{ end }}` }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
