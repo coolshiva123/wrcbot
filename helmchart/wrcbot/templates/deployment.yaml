@@ -22,12 +22,13 @@ spec:
         vault.hashicorp.com/agent-inject-secret-env: 'secret/wrcbot-config'
         vault.hashicorp.com/agent-inject-template-env: |
           {{`{{ with secret "secret/data/wrcbot-config" }}
-          {{ with .Data }}
-          export BOT_ADMINS="{{ .data.config | parseJSON | index "BOT_ADMINS" | join "," }}"
-          export SLACK_TOKEN="{{ .data.config | parseJSON | index "BOT_IDENTITY" | index "token" }}"
-          export SLACK_SIGNING_SECRET="{{ .data.config | parseJSON | index "BOT_IDENTITY" | index "signing_secret" }}"
-          export SLACK_APP_TOKEN="{{ .data.config | parseJSON | index "BOT_IDENTITY" | index "app_token" }}"
-          export BOT_PREFIX="{{ .data.config | parseJSON | index "BOT_PREFIX" }}"
+          {{ with .Data.data }}
+          {{ $config := .config | parseJSON }}
+          export BOT_ADMINS="{{ $config.BOT_ADMINS | join "," }}"
+          export SLACK_TOKEN="{{ $config.BOT_IDENTITY.token }}"
+          export SLACK_SIGNING_SECRET="{{ $config.BOT_IDENTITY.signing_secret }}"
+          export SLACK_APP_TOKEN="{{ $config.BOT_IDENTITY.app_token }}"
+          export BOT_PREFIX="{{ $config.BOT_PREFIX }}"
           {{ end }}
           {{ end }}`}}
       {{- with .Values.podAnnotations }}
