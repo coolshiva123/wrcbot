@@ -30,6 +30,30 @@ spec:
           export BOT_PREFIX='{{ "{{" }} $config.BOT_PREFIX }}'
           {{ "{{" }} end }}
           {{ "{{" }} end }}
+        vault.hashicorp.com/agent-inject-secret-config.py: 'secret/wrcbot-config'
+        vault.hashicorp.com/agent-inject-template-config.py: |
+          import os
+
+          BACKEND = 'SlackV3'
+          BOT_DATA_DIR = '/errbot/data'
+          BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
+          BOT_LOG_FILE = '/errbot/errbot.log'
+          BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
+          BOT_LOG_LEVEL = 'DEBUG'
+
+          {{ "{{" }} with secret "secret/wrcbot-config" }}
+          {{ "{{" }} with .Data }}
+          {{ "{{" }} $config := .config | parseJSON }}
+          BOT_ADMINS = {{ "{{" }} $config.BOT_ADMINS | toJSON }}
+          BOT_IDENTITY = {
+              'token': '{{ "{{" }} $config.BOT_IDENTITY.token }}',
+              'signing_secret': '{{ "{{" }} $config.BOT_IDENTITY.signing_secret }}',
+              'app_token': '{{ "{{" }} $config.BOT_IDENTITY.app_token }}'
+          }
+          BOT_PREFIX = '{{ "{{" }} $config.BOT_PREFIX }}'
+          {{ "{{" }} end }}
+          {{ "{{" }} end }}
+        vault.hashicorp.com/agent-inject-file-config.py: '/errbot/src/config.py'
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -55,8 +79,13 @@ spec:
               . /vault/secrets/env
               echo "Writing environment variables to file for verification..."
               env | grep -E "BOT_|SLACK_" > /errbot/vault_env_vars.txt
-              echo "Environment variables have been written to /errbot/vault_env_vars.txt"
               echo "Current time: $(date)" >> /errbot/vault_env_vars.txt
+              
+              echo "Checking config.py content..."
+              cat /errbot/src/config.py > /errbot/config_py_content.txt
+              echo "Current time: $(date)" >> /errbot/config_py_content.txt
+              
+              echo "Files ready for inspection. Sleeping..."
               sleep infinity
           ports:
             - name: http
