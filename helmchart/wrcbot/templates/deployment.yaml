@@ -19,7 +19,7 @@ spec:
         vault.hashicorp.com/auth-path: 'auth/kubernetes'
         vault.hashicorp.com/secret-volume-path: '/vault/secrets'
         vault.hashicorp.com/agent-init-first: 'true'
-        vault.hashicorp.com/agent-inject-secret-env: 'secret/data/wrcbot-config'
+        vault.hashicorp.com/agent-inject-secret-env: 'secret/wrcbot-config'
         vault.hashicorp.com/agent-inject-template-env: |
           {{`{{ with secret "secret/data/wrcbot-config" }}
           {{ with .Data.data }}
