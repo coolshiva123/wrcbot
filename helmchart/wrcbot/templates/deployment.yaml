@@ -27,13 +27,15 @@ spec:
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
           {{ `{{ with secret "secret/wrcbot-config" }}` }}
-          BOT_ADMINS = {{ `{{ .Data.config }}` }}
+          {{ `{{ with .Data.config | parseJSON }}` }}
+          BOT_ADMINS = ('@awsterraform30',)
           BOT_IDENTITY = {
-              'token': '{{ `{{ .Data.config.BOT_IDENTITY.token }}` }}',
-              'signing_secret': '{{ `{{ .Data.config.BOT_IDENTITY.signing_secret }}` }}',
-              'app_token': '{{ `{{ .Data.config.BOT_IDENTITY.app_token }}` }}'
+              'token': '{{ `{{ .BOT_IDENTITY.token }}` }}',
+              'signing_secret': '{{ `{{ .BOT_IDENTITY.signing_secret }}` }}',
+              'app_token': '{{ `{{ .BOT_IDENTITY.app_token }}` }}'
           }
-          BOT_PREFIX = '{{ `{{ .Data.config.BOT_PREFIX }}` }}'
+          BOT_PREFIX = '{{ `{{ .BOT_PREFIX }}` }}'
+          {{ `{{ end }}` }}
           {{ `{{ end }}` }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
