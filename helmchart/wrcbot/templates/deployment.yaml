@@ -38,7 +38,7 @@ spec:
           BOT_IDENTITY = {{ $config.BOT_IDENTITY | toJSON }}
 
           # Bot prefix from Vault
-          BOT_PREFIX = {{ $config.BOT_PREFIX | quote }}
+          BOT_PREFIX = '{{ $config.BOT_PREFIX }}'
           {{ end }}`}}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
