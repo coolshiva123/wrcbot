@@ -10,6 +10,15 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: "1.2"
 
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: "wrcbot-sa"
+  # Annotations to add to the service account
+  annotations: {}
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
@@ -49,18 +58,6 @@ tolerations: []
 
 affinity: {}
 
-# Service Account configuration
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: wrcbot-sa
-  # Create a token secret for the service account
-  createToken: true
-  # Name of the token secret
-  tokenName: wrcbot-sa-token
-
 # Bot configuration
 bot:
   # Override container command and args (useful for debugging)
@@ -91,9 +88,7 @@ bot:
       BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
       BOT_LOG_LEVEL = 'DEBUG'
       BOT_ADMINS = ()  # Will come from Vault
-      BOT_IDENTITY = {
-          'token': '',   # Will come from Vault
-          'signing_secret': '',  # Will come from Vault
-          'app_token': ''  # Will come from Vault
-      }
-      BOT_PREFIX = '<>'  # Will co your bot's user ID
+      # All configuration will be injected by the initContainer from Vault
+      # This is just a placeholder that will be replaced at runtime
+      BOT_IDENTITY = {}
+      BOT_PREFIX = ''

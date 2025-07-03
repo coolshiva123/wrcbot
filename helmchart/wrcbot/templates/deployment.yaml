@@ -35,17 +35,51 @@ spec:
             - sh
             - -c
             - |
+              set -e
+              echo "Installing required packages..."
               apk add --no-cache jq
+              
               VAULT_ADDR="http://vault:8200"
               SECRET_PATH="secret/wrcbot-config"
               ROLE="wrcbot-role"
               CONFIG_PATH="/config/config.py"
+              
+              echo "Reading service account token..."
               JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-              VAULT_TOKEN=$(curl -s --request POST \
+              if [ -z "$JWT" ]; then
+                echo "Error: Failed to read service account token"
+                exit 1
+              fi
+              
+              echo "Authenticating with Vault..."
+              VAULT_LOGIN_RESPONSE=$(curl -s --fail --request POST \
                 --data "{\"role\": \"${ROLE}\", \"jwt\": \"${JWT}\"}" \
-                ${VAULT_ADDR}/v1/auth/kubernetes/login | jq -r .auth.client_token)
-              SECRET_JSON=$(curl -s --header "X-Vault-Token: ${VAULT_TOKEN}" ${VAULT_ADDR}/v1/${SECRET_PATH})
+                ${VAULT_ADDR}/v1/auth/kubernetes/login)
+              if [ $? -ne 0 ]; then
+                echo "Error: Failed to authenticate with Vault"
+                exit 1
+              fi
+              
+              VAULT_TOKEN=$(echo "$VAULT_LOGIN_RESPONSE" | jq -r .auth.client_token)
+              if [ -z "$VAULT_TOKEN" ] || [ "$VAULT_TOKEN" = "null" ]; then
+                echo "Error: Failed to extract Vault token from response"
+                exit 1
+              fi
+              
+              echo "Fetching secret from Vault..."
+              SECRET_JSON=$(curl -s --fail --header "X-Vault-Token: ${VAULT_TOKEN}" ${VAULT_ADDR}/v1/${SECRET_PATH})
+              if [ $? -ne 0 ]; then
+                echo "Error: Failed to fetch secret from Vault"
+                exit 1
+              fi
+              
               CONFIG=$(echo "$SECRET_JSON" | jq -r .data.config)
+              if [ -z "$CONFIG" ] || [ "$CONFIG" = "null" ]; then
+                echo "Error: Failed to extract config from secret"
+                exit 1
+              fi
+              
+              echo "Generating config.py..."
               cat <<EOF > $CONFIG_PATH
 BACKEND='SlackV3'
 BOT_DATA_DIR = '/errbot/data'
@@ -57,6 +91,14 @@ BOT_ADMINS = $(echo "$CONFIG" | jq '.BOT_ADMINS')
 BOT_IDENTITY = $(echo "$CONFIG" | jq '.BOT_IDENTITY')
 BOT_PREFIX = '$(echo "$CONFIG" | jq -r '.BOT_PREFIX')'
 EOF
+              
+              echo "Verifying config file was created..."
+              if [ ! -f "$CONFIG_PATH" ]; then
+                echo "Error: Failed to create config file"
+                exit 1
+              fi
+              
+              echo "Config file successfully created!"
           volumeMounts:
             - name: config-volume
               mountPath: /config

@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: wrcbot
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"  # Ensure this runs after Vault is ready
 spec:
   project: wrcbot
   source:
@@ -27,10 +29,13 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/template/spec/containers/0/env
+        - /spec/template/spec/volumes
+        - /spec/template/spec/initContainers
     - group: rbac.authorization.k8s.io
-      kind: ClusterRoleBinding
-      name: vault-auth-delegator
+      kind: Role
       jsonPointers:
-        - /metadata
-        - /roleRef
+        - /rules
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+      jsonPointers:
         - /subjects
