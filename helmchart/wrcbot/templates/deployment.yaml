@@ -22,15 +22,25 @@ spec:
         vault.hashicorp.com/agent-inject-secret-env: 'secret/wrcbot-config'
         vault.hashicorp.com/agent-inject-template-env: |
           #!/bin/sh
+          set -e
           echo "=== Debug: Starting template processing ==="
+          
           {{ "{{" }} with secret "secret/wrcbot-config" {{ "}}" }}
           {{ "{{" }} $config := .Data.config | parseJSON {{ "}}" }}
+          
           echo "=== Debug: Parsed config data ==="
+          echo "Setting BOT_ADMINS..."
           export BOT_ADMINS="{{ "{{" }} range $i, $e := $config.BOT_ADMINS {{ "}}" }}{{ "{{" }}if $i{{ "}}" }},{{ "{{" }}end{{ "}}" }}{{ "{{" }}$e{{ "}}" }}{{ "{{" }} end {{ "}}" }}"
+          
+          echo "Setting Slack credentials..."
           export SLACK_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.token {{ "}}" }}"
           export SLACK_SIGNING_SECRET="{{ "{{" }} $config.BOT_IDENTITY.signing_secret {{ "}}" }}"
           export SLACK_APP_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.app_token {{ "}}" }}"
+          
+          echo "Setting BOT_PREFIX..."
           export BOT_PREFIX="{{ "{{" }} $config.BOT_PREFIX {{ "}}" }}"
+          
+          echo "=== Debug: Environment variables set successfully ==="
           {{ "{{" }} end {{ "}}" }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
