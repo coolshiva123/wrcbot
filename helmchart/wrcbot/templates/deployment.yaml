@@ -17,32 +17,19 @@ spec:
         vault.hashicorp.com/role: 'wrcbot-role'
         vault.hashicorp.com/namespace: '{{ .Release.Namespace }}'
         vault.hashicorp.com/auth-path: 'auth/kubernetes'
-        vault.hashicorp.com/agent-inject-secret-config.py: 'secret/data/wrcbot-config'
-        vault.hashicorp.com/agent-inject-file-config.py: '/errbot/src/config.py'
-        vault.hashicorp.com/agent-inject-template-config.py: |
-          BACKEND = 'SlackV3'
-          BOT_DATA_DIR = '/errbot/data'
-          BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
-          BOT_LOG_FILE = '/errbot/errbot.log'
-          BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
-          BOT_LOG_LEVEL = 'DEBUG'
-          {{ "{{" }}- with secret "secret/data/wrcbot-config" }}
-          {{ "{{" }}- with .Data.data }}
-          {{ "{{" }} $cfg := .config | parseJSON }}
-          BOT_ADMINS = (
-          {{- "${cfg.BOT_ADMINS}" | range $i, $e := . -}}
-            {{- if $i }}, {{ end -}}
-            "{{ "${e}" }}"
-          {{- end -}}
-          ,)
-          BOT_IDENTITY = {
-              'token': '{{ "${cfg.BOT_IDENTITY.token}" }}',
-              'signing_secret': '{{ "${cfg.BOT_IDENTITY.signing_secret}" }}',
-              'app_token': '{{ "${cfg.BOT_IDENTITY.app_token}" }}'
-          }
-          BOT_PREFIX = '{{ "${cfg.BOT_PREFIX}" }}'
-          {{ "{{" }}- end }}
-          {{ "{{" }}- end }}
+        vault.hashicorp.com/agent-inject-secret-env: 'secret/data/wrcbot-config'
+        vault.hashicorp.com/agent-inject-template-env: |
+          {{ "{{" }} with secret "secret/data/wrcbot-config" }}
+          {{ "{{" }} with .Data.data }}
+          {{ "{{" }} with .config | parseJSON }}
+          export BOT_ADMINS="{{ "{{" }} .BOT_ADMINS | join "," {{ "}}" }}"
+          export SLACK_TOKEN="{{ "{{" }} .BOT_IDENTITY.token {{ "}}" }}"
+          export SLACK_SIGNING_SECRET="{{ "{{" }} .BOT_IDENTITY.signing_secret {{ "}}" }}"
+          export SLACK_APP_TOKEN="{{ "{{" }} .BOT_IDENTITY.app_token {{ "}}" }}"
+          export BOT_PREFIX="{{ "{{" }} .BOT_PREFIX {{ "}}" }}"
+          {{ "{{" }} end }}
+          {{ "{{" }} end }}
+          {{ "{{" }} end }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -56,20 +43,25 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "wrcbot.fullname" . }}-config
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.bot.overrideCommand }}
-          command:
-            {{- toYaml .Values.bot.overrideCommand | nindent 12 }}
-          {{- end }}
-          {{- if .Values.bot.overrideArgs }}
+          command: ["/bin/sh", "-c"]
           args:
-            {{- toYaml .Values.bot.overrideArgs | nindent 12 }}
-          {{- end }}
+            - |
+              source /vault/secrets/env
+              exec errbot -c /errbot/src/config.py
+          volumeMounts:
+            - name: config-volume
+              mountPath: /errbot/src/config.py
+              subPath: config.py
           ports:
             - name: http
               containerPort: 80
