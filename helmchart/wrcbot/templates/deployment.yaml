@@ -11,8 +11,24 @@ spec:
       {{- include "wrcbot.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/agent-inject-status: 'update'
+        vault.hashicorp.com/role: 'wrcbot-role'
+        vault.hashicorp.com/agent-inject-secret-config.py: 'secret/wrcbot-config'
+        vault.hashicorp.com/agent-inject-template-config.py: |
+          {{`{{- with secret "secret/wrcbot-config" -}}
+          BACKEND = 'SlackV3'
+          BOT_DATA_DIR = '/errbot/data'
+          BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
+          BOT_LOG_FILE = '/errbot/errbot.log'
+          BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
+          BOT_LOG_LEVEL = 'DEBUG'
+          BOT_ADMINS = {{.Data.data.config | fromJSON | index "BOT_ADMINS"}}
+          BOT_IDENTITY = {{.Data.data.config | fromJSON | index "BOT_IDENTITY"}}
+          BOT_PREFIX = '{{.Data.data.config | fromJSON | index "BOT_PREFIX"}}'
+          {{- end }}`}}
+      {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
@@ -25,108 +41,6 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      volumes:
-        - name: config-volume
-          emptyDir: {}
-      initContainers:
-        - name: vault-init
-          image: alpine:3.18
-          securityContext:
-            runAsNonRoot: false
-            runAsUser: 0
-          command:
-            - sh
-            - -c
-            - |
-              set -x;
-              echo "Starting vault-init container...";
-              
-              echo "Installing required packages...";
-              apk update && apk add --no-cache jq curl bind-tools;
-              
-              VAULT_ADDR="http://vault:8200";
-              SECRET_PATH="secret/wrcbot-config";
-              ROLE="wrcbot-role";
-              CONFIG_PATH="/config/config.py";
-              
-              echo "Checking Vault connectivity...";
-              if ! curl -s -f "${VAULT_ADDR}/v1/sys/health"; then
-                echo "Error: Cannot connect to Vault at ${VAULT_ADDR}";
-                echo "DNS lookup results:";
-                nslookup vault;
-                echo "Network connectivity test:";
-                nc -zv vault 8200 || true;
-                exit 1;
-              fi;
-              
-              echo "Reading service account token...";
-              if [ ! -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
-                echo "Error: Service account token file not found";
-                ls -la /var/run/secrets/kubernetes.io/;
-                exit 1;
-              fi;
-              
-              JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token);
-              if [ -z "$JWT" ]; then
-                echo "Error: Failed to read service account token";
-                exit 1;
-              fi;
-              
-              echo "Authenticating with Vault...";
-              LOGIN_RESPONSE=$(curl -s --fail -X POST \
-                -H "Content-Type: application/json" \
-                --data "{\"role\": \"${ROLE}\", \"jwt\": \"${JWT}\"}" \
-                "${VAULT_ADDR}/v1/auth/kubernetes/login");
-              
-              if [ $? -ne 0 ]; then
-                echo "Error: Failed to authenticate with Vault";
-                echo "Response: $LOGIN_RESPONSE";
-                exit 1;
-              fi;
-              
-              TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.auth.client_token');
-              if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-                echo "Error: Failed to extract token from Vault response";
-                echo "Response: $LOGIN_RESPONSE";
-                exit 1;
-              fi;
-              
-              echo "Fetching secret from Vault...";
-              SECRET_RESPONSE=$(curl -s --fail \
-                -H "X-Vault-Token: $TOKEN" \
-                "${VAULT_ADDR}/v1/${SECRET_PATH}");
-              
-              if [ $? -ne 0 ]; then
-                echo "Error: Failed to fetch secret from Vault";
-                echo "Response: $SECRET_RESPONSE";
-                exit 1;
-              fi;
-              
-              CONFIG=$(echo "$SECRET_RESPONSE" | jq -r '.data.config // empty');
-              if [ -z "$CONFIG" ]; then
-                echo "Error: Failed to extract config from secret";
-                echo "Raw response:";
-                echo "$SECRET_RESPONSE" | jq .;
-                exit 1;
-              fi;
-              
-              echo "Generating config.py...";
-              cat > $CONFIG_PATH << EOF
-              BACKEND = 'SlackV3'
-              BOT_DATA_DIR = '/errbot/data'
-              BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
-              BOT_LOG_FILE = '/errbot/errbot.log'
-              BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
-              BOT_LOG_LEVEL = 'DEBUG'
-              BOT_ADMINS = $(echo "$CONFIG" | jq '.BOT_ADMINS')
-              BOT_IDENTITY = $(echo "$CONFIG" | jq '.BOT_IDENTITY')
-              BOT_PREFIX = '$(echo "$CONFIG" | jq -r '.BOT_PREFIX')'
-              EOF
-              
-              echo "Config file created successfully!";
-          volumeMounts:
-            - name: config-volume
-              mountPath: /config
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -146,15 +60,15 @@ spec:
               containerPort: 80
               protocol: TCP
           env:
-            # Standard environment variables
             {{- range $key, $value := .Values.bot.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
           volumeMounts:
-            - name: config-volume
+            - name: vault-secrets
               mountPath: /errbot/src/config.py
               subPath: config.py
+              readOnly: true
           {{- if not .Values.bot.disableHealthChecks }}
           livenessProbe:
             httpGet:
