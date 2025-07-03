@@ -30,27 +30,34 @@ spec:
           emptyDir: {}
       initContainers:
         - name: vault-init
-          image: curlimages/curl:8.7.1
+          image: alpine:3.18
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c
-            - >-
+            - |
               set -x;
               echo "Starting vault-init container...";
               
               echo "Installing required packages...";
-              apk add --no-cache jq;
+              apk update && apk add --no-cache jq curl bind-tools;
               
-              VAULT_ADDR="http://vault.wrcbot.svc.cluster.local:8200";
+              VAULT_ADDR="http://vault:8200";
               SECRET_PATH="secret/wrcbot-config";
               ROLE="wrcbot-role";
               CONFIG_PATH="/config/config.py";
               
-              echo "Waiting for Vault to be ready...";
-              until curl -fs ${VAULT_ADDR}/v1/sys/health; do
-                echo "Vault is not ready - sleeping 5s...";
-                sleep 5;
-              done;
+              echo "Checking Vault connectivity...";
+              if ! curl -s -f "${VAULT_ADDR}/v1/sys/health"; then
+                echo "Error: Cannot connect to Vault at ${VAULT_ADDR}";
+                echo "DNS lookup results:";
+                nslookup vault;
+                echo "Network connectivity test:";
+                nc -zv vault 8200 || true;
+                exit 1;
+              fi;
               
               echo "Reading service account token...";
               if [ ! -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
@@ -64,62 +71,59 @@ spec:
                 echo "Error: Failed to read service account token";
                 exit 1;
               fi;
+              
               echo "Authenticating with Vault...";
-              VAULT_LOGIN_RESPONSE=$(curl -v --fail --request POST \
+              LOGIN_RESPONSE=$(curl -s --fail -X POST \
+                -H "Content-Type: application/json" \
                 --data "{\"role\": \"${ROLE}\", \"jwt\": \"${JWT}\"}" \
-                ${VAULT_ADDR}/v1/auth/kubernetes/login 2>&1);
-              LOGIN_STATUS=$?;
-              echo "Vault login response: $VAULT_LOGIN_RESPONSE";
+                "${VAULT_ADDR}/v1/auth/kubernetes/login");
               
-              if [ $LOGIN_STATUS -ne 0 ]; then
-                echo "Error: Failed to authenticate with Vault. Status: $LOGIN_STATUS";
-                echo "Full response: $VAULT_LOGIN_RESPONSE";
+              if [ $? -ne 0 ]; then
+                echo "Error: Failed to authenticate with Vault";
+                echo "Response: $LOGIN_RESPONSE";
                 exit 1;
               fi;
               
-              VAULT_TOKEN=$(echo "$VAULT_LOGIN_RESPONSE" | grep -o '"client_token":"[^"]*' | cut -d'"' -f4);
-              if [ -z "$VAULT_TOKEN" ]; then
-                echo "Error: Failed to extract Vault token from response";
-                echo "Full response: $VAULT_LOGIN_RESPONSE";
+              TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.auth.client_token');
+              if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+                echo "Error: Failed to extract token from Vault response";
+                echo "Response: $LOGIN_RESPONSE";
                 exit 1;
               fi;
+              
               echo "Fetching secret from Vault...";
-              SECRET_JSON=$(curl -v --fail \
-                --header "X-Vault-Token: ${VAULT_TOKEN}" \
-                ${VAULT_ADDR}/v1/${SECRET_PATH} 2>&1);
-              SECRET_STATUS=$?;
-              echo "Secret fetch response: $SECRET_JSON";
+              SECRET_RESPONSE=$(curl -s --fail \
+                -H "X-Vault-Token: $TOKEN" \
+                "${VAULT_ADDR}/v1/${SECRET_PATH}");
               
-              if [ $SECRET_STATUS -ne 0 ]; then
-                echo "Error: Failed to fetch secret from Vault. Status: $SECRET_STATUS";
-                echo "Full response: $SECRET_JSON";
+              if [ $? -ne 0 ]; then
+                echo "Error: Failed to fetch secret from Vault";
+                echo "Response: $SECRET_RESPONSE";
                 exit 1;
               fi;
               
-              # Try to extract config using different approaches
-              CONFIG=$(echo "$SECRET_JSON" | jq -r '.data.config // empty');
-              if [ -z "$CONFIG" ]; then
-                echo "Trying alternate data path...";
-                CONFIG=$(echo "$SECRET_JSON" | jq -r '.data // empty');
-              fi;
-              
+              CONFIG=$(echo "$SECRET_RESPONSE" | jq -r '.data.config // empty');
               if [ -z "$CONFIG" ]; then
                 echo "Error: Failed to extract config from secret";
-                echo "Raw secret JSON:";
-                echo "$SECRET_JSON" | jq '.';
+                echo "Raw response:";
+                echo "$SECRET_RESPONSE" | jq .;
                 exit 1;
               fi;
+              
               echo "Generating config.py...";
-              echo 'BACKEND="SlackV3"' > $CONFIG_PATH;
-              echo 'BOT_DATA_DIR = "/errbot/data"' >> $CONFIG_PATH;
-              echo 'BOT_EXTRA_PLUGIN_DIR = "/errbot/src/plugins"' >> $CONFIG_PATH;
-              echo 'BOT_LOG_FILE = "/errbot/errbot.log"' >> $CONFIG_PATH;
-              echo 'BOT_EXTRA_BACKEND_DIR = "/opt/errbot/backend"' >> $CONFIG_PATH;
-              echo 'BOT_LOG_LEVEL = "DEBUG"' >> $CONFIG_PATH;
-              echo "BOT_ADMINS = $(echo "$CONFIG" | jq '.BOT_ADMINS')" >> $CONFIG_PATH;
-              echo "BOT_IDENTITY = $(echo "$CONFIG" | jq '.BOT_IDENTITY')" >> $CONFIG_PATH;
-              echo "BOT_PREFIX = '$(echo "$CONFIG" | jq -r '.BOT_PREFIX')'" >> $CONFIG_PATH;
-              echo "Config file successfully created!";
+              cat > $CONFIG_PATH << EOF
+              BACKEND = 'SlackV3'
+              BOT_DATA_DIR = '/errbot/data'
+              BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
+              BOT_LOG_FILE = '/errbot/errbot.log'
+              BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
+              BOT_LOG_LEVEL = 'DEBUG'
+              BOT_ADMINS = $(echo "$CONFIG" | jq '.BOT_ADMINS')
+              BOT_IDENTITY = $(echo "$CONFIG" | jq '.BOT_IDENTITY')
+              BOT_PREFIX = '$(echo "$CONFIG" | jq -r '.BOT_PREFIX')'
+              EOF
+              
+              echo "Config file created successfully!";
           volumeMounts:
             - name: config-volume
               mountPath: /config
