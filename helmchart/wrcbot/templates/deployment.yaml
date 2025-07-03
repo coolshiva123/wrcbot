@@ -116,3 +116,5 @@ EOF
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+      #changed to add config volume
