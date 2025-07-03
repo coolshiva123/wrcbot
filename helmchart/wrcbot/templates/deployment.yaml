@@ -54,8 +54,11 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
+              echo "Sourcing environment variables from Vault..."
+              source /vault/secrets/env
               mkdir -p /errbot/src
-              cp /vault/secrets/config.py /errbot/src/config.py
+              echo "Environment variables after sourcing:"
+              env | grep -E "BOT_|SLACK_"
               echo "Configuration ready for inspection. Pod sleeping..."
               sleep infinity
           ports:
