@@ -57,7 +57,8 @@ spec:
           args:
             - |
               source /vault/secrets/env
-              exec errbot -c /errbot/src/config.py
+              echo "Configuration ready for inspection. Pod sleeping..."
+              sleep infinity
           volumeMounts:
             - name: config-volume
               mountPath: /errbot/src/config.py
