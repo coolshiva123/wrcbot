@@ -20,23 +20,19 @@ spec:
         vault.hashicorp.com/agent-inject-secret-config.py: 'secret/data/wrcbot-config'
         vault.hashicorp.com/agent-inject-file-config.py: '/errbot/src/config.py'
         vault.hashicorp.com/agent-inject-template-config.py: |
-          {{ with secret "secret/data/wrcbot-config" -}}
           BACKEND = 'SlackV3'
           BOT_DATA_DIR = '/errbot/data'
           BOT_EXTRA_PLUGIN_DIR = '/errbot/src/plugins'
           BOT_LOG_FILE = '/errbot/errbot.log'
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
-          {{ with .Data.data -}}
-          BOT_ADMINS = ({{ range $i, $e := ((.config | parseJSON).BOT_ADMINS) }}{{if $i}}, {{end}}"{{$e}}"{{end}})
-          BOT_IDENTITY = {
-              'token': '{{ (.config | parseJSON).BOT_IDENTITY.token }}',
-              'signing_secret': '{{ (.config | parseJSON).BOT_IDENTITY.signing_secret }}',
-              'app_token': '{{ (.config | parseJSON).BOT_IDENTITY.app_token }}'
-          }
-          BOT_PREFIX = '{{ (.config | parseJSON).BOT_PREFIX }}'
-          {{- end }}
-          {{- end }}
+          {{ "{{" }}- with secret "secret/data/wrcbot-config" }}
+          {{ "{{" }}- with .Data.data }}
+          BOT_ADMINS = tuple({{ "{{" }} .config | parseJSON | index "BOT_ADMINS" | toJSON {{ "}}" }})
+          BOT_IDENTITY = {{ "{{" }} .config | parseJSON | index "BOT_IDENTITY" | toJSON {{ "}}" }}
+          BOT_PREFIX = "{{ "{{" }} .config | parseJSON | index "BOT_PREFIX" {{ "}}" }}"
+          {{ "{{" }}- end }}
+          {{ "{{" }}- end }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
