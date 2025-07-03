@@ -56,6 +56,7 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
+              mkdir -p /errbot/src
               source /vault/secrets/env
               echo "Configuration ready for inspection. Pod sleeping..."
               sleep infinity
