@@ -44,12 +44,17 @@ spec:
           {{ "{{" }} with secret "secret/wrcbot-config" }}
           {{ "{{" }} with .Data }}
           {{ "{{" }} $config := .config | parseJSON }}
+          # Bot admins list from Vault
           BOT_ADMINS = {{ "{{" }} $config.BOT_ADMINS | toJSON }}
+
+          # Bot identity configuration from Vault
           BOT_IDENTITY = {
               'token': '{{ "{{" }} $config.BOT_IDENTITY.token }}',
               'signing_secret': '{{ "{{" }} $config.BOT_IDENTITY.signing_secret }}',
               'app_token': '{{ "{{" }} $config.BOT_IDENTITY.app_token }}'
           }
+
+          # Bot prefix from Vault
           BOT_PREFIX = '{{ "{{" }} $config.BOT_PREFIX }}'
           {{ "{{" }} end }}
           {{ "{{" }} end }}
@@ -76,7 +81,6 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              . /vault/secrets/env
               echo "Writing environment variables to file for verification..."
               env | grep -E "BOT_|SLACK_" > /errbot/vault_env_vars.txt
               echo "Current time: $(date)" >> /errbot/vault_env_vars.txt
