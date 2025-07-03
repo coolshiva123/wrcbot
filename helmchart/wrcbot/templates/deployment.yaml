@@ -19,20 +19,15 @@ spec:
         vault.hashicorp.com/auth-path: 'auth/kubernetes'
         vault.hashicorp.com/secret-volume-path: '/vault/secrets'
         vault.hashicorp.com/agent-init-first: 'true'
-        vault.hashicorp.com/log-level: 'debug'
-        vault.hashicorp.com/agent-inject-secret-env: 'secret/wrcbot-config'
+        vault.hashicorp.com/agent-inject-secret-env: 'secret/data/wrcbot-config'
         vault.hashicorp.com/agent-inject-template-env: |
-          {{`#!/bin/sh
-          {{ with secret "secret/wrcbot-config" -}}
-          {{ with .Data.data -}}
-          {{ $config := .config | parseJSON -}}
-          export BOT_ADMINS="{{ $config.BOT_ADMINS | join "," }}"
-          export SLACK_TOKEN="{{ $config.BOT_IDENTITY.token }}"
-          export SLACK_SIGNING_SECRET="{{ $config.BOT_IDENTITY.signing_secret }}"
-          export SLACK_APP_TOKEN="{{ $config.BOT_IDENTITY.app_token }}"
-          export BOT_PREFIX="{{ $config.BOT_PREFIX }}"
-          {{- end }}
-          {{- end }}`}}
+          {{`{{ with secret "secret/data/wrcbot-config" }}
+          export BOT_ADMINS="{{ .Data.data.config | parseJSON | index "BOT_ADMINS" | join "," }}"
+          export SLACK_TOKEN="{{ .Data.data.config | parseJSON | index "BOT_IDENTITY" | index "token" }}"
+          export SLACK_SIGNING_SECRET="{{ .Data.data.config | parseJSON | index "BOT_IDENTITY" | index "signing_secret" }}"
+          export SLACK_APP_TOKEN="{{ .Data.data.config | parseJSON | index "BOT_IDENTITY" | index "app_token" }}"
+          export BOT_PREFIX="{{ .Data.data.config | parseJSON | index "BOT_PREFIX" }}"
+          {{ end }}`}}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
