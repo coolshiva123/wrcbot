@@ -53,9 +53,10 @@ spec:
           args:
             - |
               . /vault/secrets/env
-              echo "Environment variables after sourcing:"
-              env | grep -E "BOT_|SLACK_"
-              echo "Configuration ready for inspection. Pod sleeping..."
+              echo "Writing environment variables to file for verification..."
+              env | grep -E "BOT_|SLACK_" > /errbot/vault_env_vars.txt
+              echo "Environment variables have been written to /errbot/vault_env_vars.txt"
+              echo "Current time: $(date)" >> /errbot/vault_env_vars.txt
               sleep infinity
           ports:
             - name: http
