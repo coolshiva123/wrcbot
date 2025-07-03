@@ -26,19 +26,23 @@ spec:
           BOT_LOG_FILE = '/errbot/errbot.log'
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
-          {{ "{{" }} with secret "secret/data/wrcbot-config" }}
-          {{ "{{" }} with .Data.data }}
-          {{ "{{" }} with .config | parseJSON }}
-          BOT_ADMINS = ({{ range $i, $e := .BOT_ADMINS }}{{if $i}}, {{end}}"{{$e}}"{{end}},)
+          {{ "{{" }}- with secret "secret/data/wrcbot-config" }}
+          {{ "{{" }}- with .Data.data }}
+          {{ "{{" }} $config := .config | parseJSON }}
+          BOT_ADMINS = (
+          {{- range $i, $e := $config.BOT_ADMINS -}}
+            {{- if $i }}, {{ end -}}
+            "{{ $e }}"
+          {{- end -}}
+          ,)
           BOT_IDENTITY = {
-              'token': '{{ .BOT_IDENTITY.token }}',
-              'signing_secret': '{{ .BOT_IDENTITY.signing_secret }}',
-              'app_token': '{{ .BOT_IDENTITY.app_token }}'
+              'token': '{{ $config.BOT_IDENTITY.token }}',
+              'signing_secret': '{{ $config.BOT_IDENTITY.signing_secret }}',
+              'app_token': '{{ $config.BOT_IDENTITY.app_token }}'
           }
-          BOT_PREFIX = '{{ .BOT_PREFIX }}'
-          {{ "{{" }} end }}
-          {{ "{{" }} end }}
-          {{ "{{" }} end }}
+          BOT_PREFIX = '{{ $config.BOT_PREFIX }}'
+          {{ "{{" }}- end }}
+          {{ "{{" }}- end }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
