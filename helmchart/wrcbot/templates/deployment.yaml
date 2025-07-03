@@ -27,9 +27,13 @@ spec:
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
           {{ `{{ with secret "secret/wrcbot-config" }}` }}
-          BOT_ADMINS = {{ `{{ .Data.config | index "BOT_ADMINS" }}` }}
-          BOT_IDENTITY = {{ `{{ .Data.config | index "BOT_IDENTITY" }}` }}
-          BOT_PREFIX = {{ `{{ .Data.config | index "BOT_PREFIX" }}` }}
+          BOT_ADMINS = {{ `{{ .Data.config }}` }}
+          BOT_IDENTITY = {
+              'token': '{{ `{{ .Data.config.BOT_IDENTITY.token }}` }}',
+              'signing_secret': '{{ `{{ .Data.config.BOT_IDENTITY.signing_secret }}` }}',
+              'app_token': '{{ `{{ .Data.config.BOT_IDENTITY.app_token }}` }}'
+          }
+          BOT_PREFIX = '{{ `{{ .Data.config.BOT_PREFIX }}` }}'
           {{ `{{ end }}` }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
