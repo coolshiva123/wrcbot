@@ -23,32 +23,13 @@ spec:
           {{ "{{" }} with secret "secret/wrcbot-config" }}
           {{ "{{" }} with .Data }}
           {{ "{{" }} $config := .config | parseJSON }}
-          echo "Exporting Vault secrets as environment variables..."
-          export BOT_ADMINS="{{ "{{" }} $config.BOT_ADMINS | toJSON }}"
-          export SLACK_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.token }}"
-          export SLACK_SIGNING_SECRET="{{ "{{" }} $config.BOT_IDENTITY.signing_secret }}"
-          export SLACK_APP_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.app_token }}"
-          export BOT_PREFIX="{{ "{{" }} $config.BOT_PREFIX }}"
-          echo "Environment variables exported successfully"
+          export BOT_ADMINS='{{ "{{" }} $config.BOT_ADMINS | toJSON }}'
+          export SLACK_TOKEN='{{ "{{" }} $config.BOT_IDENTITY.token }}'
+          export SLACK_SIGNING_SECRET='{{ "{{" }} $config.BOT_IDENTITY.signing_secret }}'
+          export SLACK_APP_TOKEN='{{ "{{" }} $config.BOT_IDENTITY.app_token }}'
+          export BOT_PREFIX='{{ "{{" }} $config.BOT_PREFIX }}'
           {{ "{{" }} end }}
           {{ "{{" }} end }}
-        vault.hashicorp.com/agent-inject-secret-entrypoint: 'secret/wrcbot-config'
-        vault.hashicorp.com/agent-inject-template-entrypoint: |
-          #!/bin/sh
-          set -e
-          {{ "{{" }} with secret "secret/wrcbot-config" }}
-          {{ "{{" }} with .Data }}
-          {{ "{{" }} $config := .config | parseJSON }}
-          cat > /vault/secrets/env_exports << 'EOL'
-          export BOT_ADMINS="{{ "{{" }} $config.BOT_ADMINS | toJSON }}"
-          export SLACK_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.token }}"
-          export SLACK_SIGNING_SECRET="{{ "{{" }} $config.BOT_IDENTITY.signing_secret }}"
-          export SLACK_APP_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.app_token }}"
-          export BOT_PREFIX="{{ "{{" }} $config.BOT_PREFIX }}"
-          EOL
-          {{ "{{" }} end }}
-          {{ "{{" }} end }}
-          chmod +x /vault/secrets/env_exports
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -71,8 +52,8 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              . /vault/secrets/env_exports
-              echo "Environment variables:"
+              . /vault/secrets/env
+              echo "Environment variables after sourcing:"
               env | grep -E "BOT_|SLACK_"
               echo "Configuration ready for inspection. Pod sleeping..."
               sleep infinity
