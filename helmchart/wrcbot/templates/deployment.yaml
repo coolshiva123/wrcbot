@@ -21,16 +21,17 @@ spec:
         vault.hashicorp.com/agent-init-first: 'true'
         vault.hashicorp.com/agent-inject-secret-env: 'secret/wrcbot-config'
         vault.hashicorp.com/agent-inject-template-env: |
-          {{`#!/bin/sh
+          #!/bin/sh
           echo "=== Debug: Starting template processing ==="
-          {{ with secret "secret/wrcbot-config" }}
-          echo "=== Debug: Got secret, accessing data ==="
-          export BOT_ADMINS="{{ .Data.config | parseJSON | index "BOT_ADMINS" | join "," }}"
-          export SLACK_TOKEN="{{ .Data.config | parseJSON | index "BOT_IDENTITY" | index "token" }}"
-          export SLACK_SIGNING_SECRET="{{ .Data.config | parseJSON | index "BOT_IDENTITY" | index "signing_secret" }}"
-          export SLACK_APP_TOKEN="{{ .Data.config | parseJSON | index "BOT_IDENTITY" | index "app_token" }}"
-          export BOT_PREFIX="{{ .Data.config | parseJSON | index "BOT_PREFIX" }}"
-          {{ end }}`}}
+          {{ "{{" }} with secret "secret/wrcbot-config" {{ "}}" }}
+          {{ "{{" }} $config := .Data.config | parseJSON {{ "}}" }}
+          echo "=== Debug: Parsed config data ==="
+          export BOT_ADMINS="{{ "{{" }} range $i, $e := $config.BOT_ADMINS {{ "}}" }}{{ "{{" }}if $i{{ "}}" }},{{ "{{" }}end{{ "}}" }}{{ "{{" }}$e{{ "}}" }}{{ "{{" }} end {{ "}}" }}"
+          export SLACK_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.token {{ "}}" }}"
+          export SLACK_SIGNING_SECRET="{{ "{{" }} $config.BOT_IDENTITY.signing_secret {{ "}}" }}"
+          export SLACK_APP_TOKEN="{{ "{{" }} $config.BOT_IDENTITY.app_token {{ "}}" }}"
+          export BOT_PREFIX="{{ "{{" }} $config.BOT_PREFIX {{ "}}" }}"
+          {{ "{{" }} end {{ "}}" }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
