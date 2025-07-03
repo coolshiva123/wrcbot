@@ -21,9 +21,18 @@ spec:
         vault.hashicorp.com/agent-init-first: 'true'
         vault.hashicorp.com/agent-inject-secret-env: 'secret/wrcbot-config'
         vault.hashicorp.com/agent-inject-template-env: |
-          {{`{{ with secret "secret/data/wrcbot-config" }}
+          {{`#!/bin/sh
+          echo "=== Debug: Starting template processing ==="
+          {{ with secret "secret/data/wrcbot-config" }}
+          echo "=== Debug: Raw secret data ==="
+          echo '{{ . | toJSON }}'
+          echo "=== Debug: .Data.data content ==="
+          echo '{{ .Data.data | toJSON }}'
           {{ with .Data.data }}
+          echo "=== Debug: Parsing config JSON ==="
           {{ $config := .config | parseJSON }}
+          echo '{{ $config | toJSON }}'
+          echo "=== Debug: Setting environment variables ==="
           export BOT_ADMINS="{{ $config.BOT_ADMINS | join "," }}"
           export SLACK_TOKEN="{{ $config.BOT_IDENTITY.token }}"
           export SLACK_SIGNING_SECRET="{{ $config.BOT_IDENTITY.signing_secret }}"
