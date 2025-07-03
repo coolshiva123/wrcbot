@@ -17,6 +17,7 @@ spec:
         vault.hashicorp.com/role: 'wrcbot-role'
         vault.hashicorp.com/agent-inject-secret-config.py: 'secret/wrcbot-config'
         vault.hashicorp.com/agent-inject-template-config.py: |
+        vault.hashicorp.com/agent-inject-file-config.py: '/config-py/config.py'
           {{`{{- with secret "secret/wrcbot-config" -}}
           BACKEND = 'SlackV3'
           BOT_DATA_DIR = '/errbot/data'
@@ -64,11 +65,16 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+          # The config.py file will be mounted by the Vault Agent Injector automatically
+          # at /vault/secrets/config.py, so we just need to link it to our target location
           volumeMounts:
-            - name: vault-secrets
+            - name: config-py
               mountPath: /errbot/src/config.py
               subPath: config.py
               readOnly: true
+      volumes:
+        - name: config-py
+          emptyDir: {}
           {{- if not .Values.bot.disableHealthChecks }}
           livenessProbe:
             httpGet:
