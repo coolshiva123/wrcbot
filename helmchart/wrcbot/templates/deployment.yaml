@@ -17,25 +17,9 @@ spec:
         vault.hashicorp.com/role: 'wrcbot-role'
         vault.hashicorp.com/namespace: '{{ .Release.Namespace }}'
         vault.hashicorp.com/auth-path: 'auth/kubernetes'
-        # Environment variables template
-        vault.hashicorp.com/agent-inject-secret-env: 'secret/wrcbot-config'
-        vault.hashicorp.com/agent-inject-template-env: |
-          #!/bin/sh
-          echo "Exporting Vault secrets as environment variables..."
-          {{ "{{" }} with secret "secret/wrcbot-config" }}
-          {{ "{{" }} with .Data }}
-          {{ "{{" }} with .config | parseJSON }}
-          export BOT_ADMINS='{{ "{{" }} .BOT_ADMINS | toJSON }}'
-          export SLACK_TOKEN='{{ "{{" }} .BOT_IDENTITY.token }}'
-          export SLACK_SIGNING_SECRET='{{ "{{" }} .BOT_IDENTITY.signing_secret }}'
-          export SLACK_APP_TOKEN='{{ "{{" }} .BOT_IDENTITY.app_token }}'
-          export BOT_PREFIX='{{ "{{" }} .BOT_PREFIX }}'
-          {{ "{{" }} end }}
-          {{ "{{" }} end }}
-          {{ "{{" }} end }}
-          echo "Environment variables exported successfully"
-        # Config.py template - inject to a temporary location first
+        # Single template for both env and config.py
         vault.hashicorp.com/agent-inject-secret-config.py: 'secret/wrcbot-config'
+        vault.hashicorp.com/agent-inject-file-config.py: '/vault/secrets/config.py'
         vault.hashicorp.com/agent-inject-template-config.py: |
           BACKEND = 'SlackV3'
           BOT_DATA_DIR = '/errbot/data'
@@ -86,13 +70,6 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              # Load environment variables
-              . /vault/secrets/env
-              
-              echo "Writing environment variables to file for verification..."
-              env | grep -E "BOT_|SLACK_" > /errbot/vault_env_vars.txt
-              echo "Current time: $(date)" >> /errbot/vault_env_vars.txt
-              
               echo "Checking original config.py content..."
               echo "=== Original config.py ===" > /errbot/config_py_content.txt
               cat /errbot/src/config.py >> /errbot/config_py_content.txt
@@ -103,6 +80,10 @@ spec:
               echo "=== New config.py ===" >> /errbot/config_py_content.txt
               cat /errbot/src/config.py >> /errbot/config_py_content.txt
               echo "Current time: $(date)" >> /errbot/config_py_content.txt
+              
+              echo "Writing environment variables to file for verification..."
+              env | grep -E "BOT_|SLACK_" > /errbot/vault_env_vars.txt
+              echo "Current time: $(date)" >> /errbot/vault_env_vars.txt
               
               echo "Files ready for inspection. Sleeping..."
               sleep infinity
