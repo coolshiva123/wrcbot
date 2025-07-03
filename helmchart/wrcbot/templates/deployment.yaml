@@ -27,12 +27,13 @@ spec:
           BOT_LOG_FILE = '/errbot/errbot.log'
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
-          {{- with .Data.data }}
-          BOT_ADMINS = {{ .config | parseJSON | index "BOT_ADMINS" }}
-          BOT_IDENTITY = {{ .config | parseJSON | index "BOT_IDENTITY" }}
-          BOT_PREFIX = "{{ .config | parseJSON | index "BOT_PREFIX" }}"
-          {{- end }}
-          {{- end }}` }}
+          {{- with .Data.data -}}
+          {{- $config := .config | parseJSON -}}
+          BOT_ADMINS = {{ $config.BOT_ADMINS | toJSON }}
+          BOT_IDENTITY = {{ $config.BOT_IDENTITY | toJSON }}
+          BOT_PREFIX = "{{ $config.BOT_PREFIX }}"
+          {{- end -}}
+          {{- end -}}` }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
