@@ -27,10 +27,10 @@ spec:
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
           {{ `{{ with secret "secret/wrcbot-config" }}` }}
-          {{ `{{ if .Data.bot_admins }}` }}BOT_ADMINS = {{ `{{ .Data.bot_admins }}` }}{{ `{{ end }}` }}
-          {{ `{{ if .Data.bot_prefix }}` }}BOT_PREFIX = {{ `{{ .Data.bot_prefix }}` }}{{ `{{ end }}` }}
-          {{ `{{ if .Data.bot_identity }}` }}BOT_IDENTITY = {{ `{{ .Data.bot_identity }}` }}{{ `{{ end }}` }}
-          {{ `{{ end }}` }}
+          BOT_ADMIN = {{ `{{ .Data.BOT_ADMIN | quote }}` }}
+          BOT_PREFIX = {{ `{{ .Data.BOT_PREFIX | quote }}` }}
+          BOT_IDENTITY = {{ `{{ .Data.BOT_IDENTITY | quote }}` }}
+          {{- `{{ end }}` }}
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
