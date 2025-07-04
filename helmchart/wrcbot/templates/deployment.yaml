@@ -27,7 +27,8 @@ spec:
           BOT_EXTRA_BACKEND_DIR = '/opt/errbot/backend'
           BOT_LOG_LEVEL = 'DEBUG'
           {{ `{{ with secret "secret/wrcbot-config" }}` }}
-          BOT_ADMIN = '{{ `{{ .Data.BOT_ADMIN }}` }}'
+          #BOT_ADMIN = '{{ `{{ .Data.BOT_ADMIN }}` }}'
+          BOT_ADMIN = {{ `{{ .Data.BOT_ADMIN }}` }}
           BOT_PREFIX = '{{ `{{ .Data.BOT_PREFIX }}` }}'
           # BOT_IDENTITY = '{{ `{{ .Data.BOT_IDENTITY }}` }}'
           BOT_IDENTITY = {{ `{{ .Data.BOT_IDENTITY }}` }}
