@@ -18,7 +18,7 @@ spec:
         vault.hashicorp.com/namespace: '{{ .Release.Namespace }}'
         vault.hashicorp.com/auth-path: 'auth/kubernetes'
         vault.hashicorp.com/agent-inject-secret-config.py: 'secret/wrcbot-config'
-        vault.hashicorp.com/agent-inject-file-config.py: '/vault/secrets/config.py'
+        vault.hashicorp.com/agent-inject-file-config.py: 'config.py'
         vault.hashicorp.com/agent-inject-template-config.py: |
           BACKEND = 'SlackV3'
           BOT_DATA_DIR = '/errbot/data'
