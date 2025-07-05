@@ -34,6 +34,13 @@ spec:
           BOT_PREFIX = '{{ `{{ .Data.BOT_PREFIX }}` }}'
           BOT_IDENTITY = {{ `{{ .Data.BOT_IDENTITY }}` }}
           {{- `{{ end }}` }}
+          BOT_EXTRA_STORAGE_PLUGINS_DIR='/errbot/src/storageplugins/'
+          STORAGE = 'Redis'
+          STORAGE_CONFIG = {
+                            'host': 'localhost',
+                            'port': 6379,
+                            'db': 0,
+                            }
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
