@@ -37,7 +37,7 @@ spec:
           BOT_EXTRA_STORAGE_PLUGINS_DIR='/errbot/src/storageplugins/'
           STORAGE = 'Redis'
           STORAGE_CONFIG = {
-                  'host': os.environ['REDIS_REDIS_SERVICE_HOST'],
+                  'host': 'redis-redis.wrcbot.svc.cluster.local',
                   'port': int(os.environ['REDIS_REDIS_SERVICE_PORT']),
                   'db': 0,
                   }
