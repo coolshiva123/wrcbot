@@ -37,10 +37,10 @@ spec:
           BOT_EXTRA_STORAGE_PLUGINS_DIR='/errbot/src/storageplugins/'
           STORAGE = 'Redis'
           STORAGE_CONFIG = {
-                            'host': 'localhost',
-                            'port': 6379,
-                            'db': 0,
-                            }
+                  'host': os.environ['REDIS_REDIS_SERVICE_HOST'],
+                  'port': int(os.environ['REDIS_REDIS_SERVICE_PORT']),
+                  'db': 0,
+                  }
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
