@@ -1,0 +1,9 @@
+[Core]
+Name = SimpleNameCollector
+Module = simple_name_collector
+
+[Documentation]
+Description = A simple name collector plugin that uses Slack blocks with direct Slack client access
+
+[Python]
+Version = 3.6.0
