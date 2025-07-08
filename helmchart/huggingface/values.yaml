@@ -1,7 +1,7 @@
 replicaCount: 1
 image:
-  repository: huggingface-xformer
-  tag: latest
+  repository: huggingface
+  tag: 0.1
   pullPolicy: IfNotPresent
 service:
   type: ClusterIP
