@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "huggingface.fullname" . }}
+  labels:
+    app: {{ include "huggingface.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "huggingface.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "huggingface.name" . }}
+    spec:
+      containers:
+        - name: huggingface-xformer
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+{{- if .Values.resources }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+{{- end }}

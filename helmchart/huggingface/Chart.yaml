@@ -1,0 +1,5 @@
+apiVersion: v2
+name: huggingface
+version: 0.1.0
+description: A Helm chart for deploying HuggingFaceXformer summarization API
+appVersion: "1.0"
