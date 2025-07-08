@@ -31,10 +31,10 @@ class MockJira(BotPlugin):
         if not slack_client or not channel or not message_ts:
             return False
 
-        # Handle :jira: reaction (parent message)
+        # Handle :jira: reaction (parent message only)
         if reaction == 'jira':
             parent_ts = message_ts
-            # Only allow on parent message (not thread reply)
+            # Fetch the message and check if it's a parent (not a thread reply)
             msg_info = slack_client.conversations_history(channel=channel, latest=parent_ts, inclusive=True, limit=1)
             messages = msg_info.get('messages', [])
             if not messages:
@@ -70,15 +70,8 @@ class MockJira(BotPlugin):
                 )
                 self.log.info(f"Jira already exists for channel={channel}, ts={parent_ts}")
                 return True
-            # Fetch the message to check if it's a parent (not a thread reply)
+            # Create the ticket
             try:
-                msg_info = slack_client.conversations_history(channel=channel, latest=parent_ts, inclusive=True, limit=1)
-                messages = msg_info.get('messages', [])
-                if not messages:
-                    return False
-                message = messages[0]
-                if 'thread_ts' in message and message['thread_ts'] != message['ts']:
-                    return False
                 jira_number = self._generate_jira_number()
                 slack_client.chat_postMessage(
                     channel=channel,
@@ -172,7 +165,10 @@ class MockJira(BotPlugin):
             if not messages:
                 return False
             message = messages[0]
-            if 'thread_ts' in message and message['thread_ts'] != message['ts']:
+            if ('thread_ts' in message and message['thread_ts'] != message['ts']) or \
+               ('thread_ts' not in message and 'ts' not in message):
+                # This is a thread reply or malformed message, do not create a ticket
+                self.log.info(f":jira: reaction ignored: not a parent message (channel={channel}, ts={parent_ts})")
                 return False
             self.put_jira_in_review(channel, parent_ts, user)
             return True
@@ -185,7 +181,10 @@ class MockJira(BotPlugin):
             if not messages:
                 return False
             message = messages[0]
-            if 'thread_ts' in message and message['thread_ts'] != message['ts']:
+            if ('thread_ts' in message and message['thread_ts'] != message['ts']) or \
+               ('thread_ts' not in message and 'ts' not in message):
+                # This is a thread reply or malformed message, do not create a ticket
+                self.log.info(f":jira: reaction ignored: not a parent message (channel={channel}, ts={parent_ts})")
                 return False
             self.resolve_jira(channel, parent_ts, user)
             return True
