@@ -1,0 +1,74 @@
+PROMPT FOR CREATING SLACK REACTION HANDLER PLUGINS WITH JIRA INTEGRATION
+=====================================================================================
+
+Use this prompt when you want to create a similar reaction handler plugin for Slack bots using Errbot framework:
+
+---
+
+PROMPT:
+"I need to create a Slack reaction handler plugin for Errbot with mock ticket creation. Please create both .plug and .py files that:
+
+1. Responds to a specific emoji reaction (e.g., :jira:, :github:, :ticket:)
+2. Detects whether the reaction was added to a root message or a threaded reply
+3. Implements smart ticket creation logic:
+   - Creates mock tickets (4-digit format like PROJ-1234) ONLY for root messages
+   - Blocks ticket creation on reply threads with helpful error message
+   - Prevents duplicate tickets by checking bot's previous responses (stateless)
+4. Sends different threaded responses based on context:
+   - 'Ticket created: PROJ-1234 + summary + link' for new tickets
+   - 'Ticket already exists, check thread above' for duplicates  
+   - 'Cannot create tickets on replies' for threaded messages
+5. Uses robust message detection that handles Slack API quirks
+6. Includes proper error handling and logging
+7. Follows the existing plugin patterns in the workspace
+
+The plugin should:
+- Work with SlackV3 backend and SlackV3ReactionsExtension
+- Use getattr(self._bot, 'slack_web', None) to access Slack client
+- Implement multiple fallback methods for message type detection
+- Use conversations_history with time windows for exact message matching
+- Fall back to conversations_replies for thread traversal if needed
+- Extract message content for ticket summaries (truncated to 50 chars)
+- Generate 4-digit random ticket numbers (1000-9999)
+- Check for duplicate tickets by scanning bot's previous thread replies
+- Use pattern matching to identify existing ticket creation messages
+- Include detailed logging for debugging
+
+Mock Ticket Features:
+- Format: [PROJECT]-#### (e.g., PROJ-1234, GITHUB-5678)
+- Smart summaries from actual Slack message content
+- Realistic URLs: https://yourcompany.atlassian.net/browse/[TICKET]
+- Rich formatted responses with emojis and sections
+- Stateless duplicate prevention using message history
+
+Place the files in: [YOUR_PLUGIN_DIRECTORY_PATH]
+Name the plugin: [YOUR_PLUGIN_NAME]  
+React to emoji: [YOUR_EMOJI_NAME]
+Ticket prefix: [YOUR_TICKET_PREFIX] (e.g., PROJ, GITHUB, TASK)"
+
+---
+
+ADDITIONAL CONTEXT TO PROVIDE:
+- Show existing plugin structure if available
+- Mention any specific Slack permissions needed (reactions:read, chat:write, channels:history)
+- Include workspace folder structure
+- Specify exact file paths where plugins should be created
+- Provide company/project details for realistic ticket URLs
+
+KEY TECHNICAL DETAILS THAT MADE THIS WORK:
+- Using time window searches (target_ts ± 1) instead of exact timestamp boundaries
+- Implementing exact timestamp string matching within returned message arrays  
+- Multiple fallback methods: direct history search → thread traversal → safe defaults
+- Proper thread_ts vs ts comparison for detecting replies
+- Stateless duplicate detection using conversations_replies to scan bot messages
+- Pattern matching against ticket creation indicators ('✅ Jira ticket created:', 'PROJ-', etc.)
+- Bot identity detection using multiple methods (user_id, bot_id, auth_test)
+- Safe error handling that defaults to allowing operations vs blocking
+- Rich message formatting with emojis and structured information
+- Message content extraction for intelligent ticket summaries
+- Robust error handling with meaningful fallbacks
+
+EXAMPLE RESPONSES:
+Root Message (New): "✅ Jira ticket created: PROJ-1234\n📋 Summary: Your message content...\n🔗 Link: https://company.atlassian.net/browse/PROJ-1234"
+Root Message (Duplicate): "ℹ️ Jira ticket already exists for this message. Check the thread above for details."
+Reply Message: "❌ You can't create Jira tickets on reply threads. Please react to the root message instead."

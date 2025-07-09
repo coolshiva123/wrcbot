@@ -1,0 +1,4 @@
+[Core]
+Name = JiraReactionHandler
+Module = jira_reaction_handler
+Core = yes
