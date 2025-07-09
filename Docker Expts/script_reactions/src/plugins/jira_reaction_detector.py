@@ -7,17 +7,24 @@ import random
 class JiraReactionDetector(BotPlugin):
     """
     Plugin to handle Jira-related reactions.
+    Version: 2.1 - Enhanced Reply Detection
     
     Supported Reactions:
     - :jira: - Creates mock MOCK-OPS tickets on root messages only
     - :jirainreview: - Puts existing tickets in review status on root messages only
     - :jiracloseticket: - Closes existing tickets on root messages only
+    - :add2jira: - Echoes back the message content of the reply message
     
     Features:
-    - Strict message type detection (root vs reply)
-    - Duplicate ticket prevention
+    - Simplified and robust reply/root message detection using thread_ts field
+    - Duplicate ticket prevention with status tracking
+    - Enhanced debugging with emoji indicators
+    - Comprehensive error handling and permission checking
     - Status change tracking with timestamps
-    - Comprehensive error handling and logging
+    
+    Key Logic:
+    - Root messages: No thread_ts OR thread_ts == message ts
+    - Reply messages: thread_ts != message ts
     """
 
     def activate(self):
@@ -27,6 +34,7 @@ class JiraReactionDetector(BotPlugin):
     def _make_slack_api_call_with_retry(self, slack_client, method_name, max_retries=3, **kwargs):
         """
         Make a Slack API call with retry logic for rate limiting and transient errors.
+        Also checks for permission-related errors.
         """
         for attempt in range(max_retries + 1):
             try:
@@ -50,6 +58,16 @@ class JiraReactionDetector(BotPlugin):
                     else:
                         self.log.error(f"Rate limiting persisted after {max_retries} retries for {method_name}")
                         return None
+                elif response.get('error') == 'missing_scope':
+                    # Special handling for permission errors
+                    self.log.error(f"PERMISSION ERROR in {method_name}: Bot token is missing required OAuth scopes.")
+                    self.log.error("Please check PERMISSION_CHECK_README.md and update your bot token permissions.")
+                    return {
+                        'ok': False,
+                        'error': 'missing_scope',
+                        'needed': response.get('needed', 'unknown_scope'),
+                        'provided': response.get('provided', [])
+                    }
                 else:
                     error_msg = response.get('error', 'Unknown error')
                     self.log.warning(f"Slack API error in {method_name}: {error_msg}")
@@ -74,7 +92,7 @@ class JiraReactionDetector(BotPlugin):
         """
         try:
             reaction = event.get('reaction')
-            if reaction not in ['jira', 'jirainreview', 'jiracloseticket']:
+            if reaction not in ['jira', 'jirainreview', 'jiracloseticket', 'add2jira']:
                 return False
             
             self.log.info(f"Handling {reaction} reaction: {json.dumps(event, indent=2)}")
@@ -116,6 +134,19 @@ class JiraReactionDetector(BotPlugin):
                     response_text = "No Action triggered - :jiracloseticket: will work in root messages only."
                 else:
                     response_text = self._handle_jira_close_ticket(channel, timestamp, user_id)
+            elif reaction == 'add2jira':
+                # Enhanced debugging for add2jira
+                self.log.info(f"🔍 Processing add2jira reaction on message {timestamp}")
+                
+                is_reply_result = self._is_reply_message(channel, timestamp)
+                self.log.info(f"🎯 Reply detection result: {is_reply_result}")
+                
+                if is_reply_result:
+                    self.log.info(f"✅ Confirmed as REPLY - calling _summarize_thread_replies")
+                    response_text = self._summarize_thread_replies(channel, timestamp)
+                else:
+                    self.log.info(f"❌ Confirmed as ROOT - no action taken")
+                    response_text = "No action needed on root message. Please use :add2jira: reaction on reply messages only."
             
             # Send threaded response
             self._send_threaded_response(channel, timestamp, response_text)
@@ -129,7 +160,8 @@ class JiraReactionDetector(BotPlugin):
 
     def _is_reply_message(self, channel, timestamp):
         """
-        Use multiple strict approaches to determine if this is a reply message.
+        Simplified and robust method to determine if this is a reply message.
+        The key insight: If a message has thread_ts that differs from its own ts, it's a reply.
         """
         try:
             # Access the Slack client through the bot backend
@@ -140,15 +172,16 @@ class JiraReactionDetector(BotPlugin):
             
             self.log.info(f"Checking message type for timestamp: {timestamp}")
             
-            # Method 1: conversations_history with exact timestamp match
+            # Primary method: Get the message directly and check thread_ts field
             try:
                 target_ts = float(timestamp)
+                self.log.info(f"Getting message directly with conversations_history")
                 
                 response = self._make_slack_api_call_with_retry(
                     slack_client,
                     'conversations_history',
                     channel=channel,
-                    latest=str(target_ts + 1),  # Time window to ensure we get the message
+                    latest=str(target_ts + 1),
                     oldest=str(target_ts - 1),
                     limit=10,
                     inclusive=True
@@ -157,88 +190,66 @@ class JiraReactionDetector(BotPlugin):
                 if response and response.get('messages'):
                     for msg in response['messages']:
                         if msg.get('ts') == timestamp:
-                            # If message has thread_ts and it's different from its own ts,
-                            # then it's a reply
-                            has_thread_ts = 'thread_ts' in msg and msg['thread_ts'] != msg['ts']
-                            self.log.info(f"Method 1 result: Message {timestamp} is_reply={has_thread_ts}")
-                            return has_thread_ts
-                else:
-                    self.log.warning(f"Method 1: No messages returned from conversations_history for {timestamp}")
+                            msg_thread_ts = msg.get('thread_ts')
+                            msg_ts = msg.get('ts')
+                            
+                            self.log.info(f"Found message - ts: {msg_ts}, thread_ts: {msg_thread_ts}")
+                            
+                            # CRITICAL LOGIC: If thread_ts exists and differs from message ts, it's a reply
+                            if msg_thread_ts and msg_thread_ts != msg_ts:
+                                self.log.info(f"✅ REPLY DETECTED: thread_ts ({msg_thread_ts}) != message ts ({msg_ts})")
+                                return True
+                            else:
+                                self.log.info(f"❌ ROOT MESSAGE: No thread_ts or thread_ts == message ts")
+                                return False
+                                
+                self.log.warning("Message not found in conversations_history, trying fallback")
                     
             except Exception as e:
-                self.log.warning(f"Method 1 failed in _is_reply_message: {e}")
+                self.log.warning(f"Primary method failed: {e}")
             
-            # Method 2: conversations_replies as a fallback
+            # Fallback method: Try conversations_replies to see if we can find the message
             try:
-                self.log.info("Trying conversations_replies fallback...")
+                self.log.info("Fallback: Trying conversations_replies to find message in potential threads")
                 
-                thread_response = self._make_slack_api_call_with_retry(
-                    slack_client,
-                    'conversations_replies',
-                    channel=channel,
-                    ts=timestamp
-                )
-                
-                if thread_response and thread_response.get('messages'):
-                    messages = thread_response['messages']
-                    
-                    # If we get back multiple messages and our timestamp isn't the first,
-                    # it's definitely a reply
-                    if len(messages) > 1:
-                        first_msg_ts = messages[0].get('ts')
-                        if first_msg_ts != timestamp:
-                            self.log.info(f"Method 2 result: Message {timestamp} is a reply (not first in thread)")
-                            return True
-                    
-                    # Even if we're the only message or the first message,
-                    # check for thread_ts
-                    for msg in messages:
-                        if msg.get('ts') == timestamp:
-                            has_thread_ts = 'thread_ts' in msg and msg['thread_ts'] != msg['ts']
-                            self.log.info(f"Method 2 result: Message {timestamp} is_reply={has_thread_ts}")
-                            return has_thread_ts
-                else:
-                    self.log.warning(f"Method 2: No messages returned from conversations_replies for {timestamp}")
-                    
-            except Exception as e:
-                self.log.warning(f"Method 2 failed in _is_reply_message: {e}")
-            
-            # Method 3: Last resort - try to get the parent message
-            try:
-                self.log.info("Trying to find parent message as last resort...")
-                
-                # If this is a reply, we should be able to find its parent
-                # by looking at the thread_ts attribute
-                thread_response = self._make_slack_api_call_with_retry(
+                # Get recent messages to find potential thread roots
+                recent_response = self._make_slack_api_call_with_retry(
                     slack_client,
                     'conversations_history',
                     channel=channel,
-                    latest=str(float(timestamp) + 0.0001),
-                    inclusive=True,
-                    limit=5
+                    limit=30
                 )
                 
-                if thread_response and thread_response.get('messages'):
-                    for msg in thread_response['messages']:
-                        if msg.get('ts') == timestamp:
-                            # Final check: if this message has thread_ts and it's different
-                            # from its own ts, it's a reply
-                            thread_ts = msg.get('thread_ts')
-                            if thread_ts and thread_ts != timestamp:
-                                self.log.info(f"Method 3 result: Message {timestamp} is a reply to {thread_ts}")
-                                return True
-                            break
-                    
-                    self.log.info(f"Method 3 result: Message {timestamp} is a root message")
-                    return False
-                else:
-                    self.log.warning(f"Method 3: Could not retrieve message {timestamp}")
-                    
+                if recent_response and recent_response.get('messages'):
+                    for potential_root in recent_response['messages']:
+                        # Skip if this is our target message
+                        if potential_root.get('ts') == timestamp:
+                            self.log.info(f"Found our target message in recent history as root")
+                            return False
+                            
+                        # Check if this message has replies
+                        if potential_root.get('reply_count', 0) > 0:
+                            root_ts = potential_root.get('ts')
+                            
+                            # Get thread and check if our message is in it
+                            thread_response = self._make_slack_api_call_with_retry(
+                                slack_client,
+                                'conversations_replies',
+                                channel=channel,
+                                ts=root_ts
+                            )
+                            
+                            if thread_response and thread_response.get('messages'):
+                                for msg in thread_response['messages']:
+                                    if msg.get('ts') == timestamp:
+                                        self.log.info(f"✅ REPLY DETECTED: Found message in thread starting at {root_ts}")
+                                        return True
+                                        
             except Exception as e:
-                self.log.warning(f"Method 3 failed in _is_reply_message: {e}")
+                self.log.warning(f"Fallback method failed: {e}")
             
-            # If all methods fail, assume it's a root message
-            self.log.warning(f"All methods failed for message {timestamp}, assuming root message")
+            # Default: assume root message if we can't determine otherwise
+            self.log.info(f"Could not definitively determine message type - defaulting to ROOT for {timestamp}")
             return False
             
         except Exception as e:
@@ -498,83 +509,236 @@ class JiraReactionDetector(BotPlugin):
             self.log.error(f"Error handling jiracloseticket reaction: {e}")
             return f"❌ Error closing ticket: {str(e)}"
     
-    def _find_existing_ticket(self, channel, timestamp):
+    def _handle_add_to_jira(self, channel, timestamp, user_id):
         """
-        Find an existing ticket in a thread by scanning bot messages.
-        Returns ticket information if found, None otherwise.
+        Handle :add2jira: reaction to add a comment to an existing ticket.
+        Only works on reply messages, not on root messages.
+        """
+        try:
+            # For reply messages, we need to find the root message and then find its ticket
+            thread_root = self._get_thread_root(channel, timestamp)
+            if not thread_root or thread_root == timestamp:
+                return "❌ This is not a reply message. The :add2jira: reaction only works on replies to add comments to tickets."
+                
+            # First check if there's an existing ticket for the root message
+            ticket_info = self._find_existing_ticket(channel, thread_root)
+            
+            if not ticket_info:
+                return "❌ No MOCK-OPS ticket found for the parent message. Please create a ticket with :jira: reaction on the root message first."
+            
+            # Get the content of the reply message to use as the comment
+            message_content = self._get_message_content(channel, timestamp)
+            if not message_content:
+                message_content = "No message content could be retrieved"
+            
+            # Mock adding a comment to the ticket
+            ticket_key = ticket_info.get('key', 'UNKNOWN-TICKET')
+            comment_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+            
+            # Create response for successful comment addition
+            response_text = f"💬 Comment added to MOCK-OPS ticket {ticket_key}\n"\
+                           f"👤 Added by: <@{user_id}>\n"\
+                           f"⏰ Added on: {comment_time}\n"\
+                           f"📝 Comment: \"{message_content[:100]}{'...' if len(message_content) > 100 else ''}\"\n"\
+                           f"🔗 Link: {ticket_info.get('url', 'https://yourcompany.atlassian.net/browse/' + ticket_key)}"
+            
+            self.log.info(f"Added comment to ticket {ticket_key}")
+            return response_text
+            
+        except Exception as e:
+            self.log.error(f"Error handling add2jira reaction: {e}")
+            return f"❌ Error adding comment to ticket: {str(e)}"
+    
+    def _get_thread_root(self, channel, timestamp):
+        """
+        Get the root timestamp of the thread for a given message.
+        Returns the timestamp if it's already a root message.
         """
         try:
             slack_client = getattr(self._bot, 'slack_web', None)
             if not slack_client:
-                self.log.warning("Slack client not available for finding existing ticket")
-                return None
+                self.log.warning("Slack client not available for thread root detection")
+                return timestamp  # Safe fallback
             
-            # Get bot's user ID
-            bot_user_id = self._get_bot_user_id()
-            if not bot_user_id:
-                self.log.warning("Could not determine bot user ID")
-                return None
+            self.log.info(f"Getting thread root for message: {timestamp}")
             
-            # Get thread replies
-            thread_response = self._make_slack_api_call_with_retry(
-                slack_client, 
+            # First, try conversations.replies with the current timestamp
+            try:
+                thread_response = self._make_slack_api_call_with_retry(
+                    slack_client,
+                    'conversations_replies',
+                    channel=channel,
+                    ts=timestamp
+                )
+                
+                if thread_response and thread_response.get('messages'):
+                    messages = thread_response['messages']
+                    if len(messages) > 0:
+                        # The first message in replies is always the root
+                        root_timestamp = messages[0].get('ts')
+                        self.log.info(f"Found thread root: {root_timestamp} for message: {timestamp}")
+                        return root_timestamp
+            except Exception as e:
+                self.log.warning(f"conversations.replies method failed: {e}")
+            
+            # Fallback: Try to get the message details using conversations.history
+            try:
+                target_ts = float(timestamp)
+                response = self._make_slack_api_call_with_retry(
+                    slack_client,
+                    'conversations_history',
+                    channel=channel,
+                    latest=str(target_ts + 1),
+                    oldest=str(target_ts - 1),
+                    limit=10,
+                    inclusive=True
+                )
+                
+                if response and response.get('messages'):
+                    for msg in response['messages']:
+                        if msg.get('ts') == timestamp:
+                            # If this message has a thread_ts that's different from its own ts, 
+                            # then thread_ts is the root
+                            thread_ts = msg.get('thread_ts')
+                            if thread_ts and thread_ts != timestamp:
+                                self.log.info(f"Found thread root: {thread_ts} for message: {timestamp}")
+                                return thread_ts
+                            else:
+                                self.log.info(f"Message {timestamp} is already the root message")
+                                return timestamp  # This is already the root
+            except Exception as e:
+                self.log.warning(f"conversations.history fallback failed: {e}")
+            
+            # Final fallback: assume it's a root message
+            self.log.warning(f"Could not determine thread root for {timestamp}, assuming it's the root")
+            return timestamp
+            
+        except Exception as e:
+            self.log.error(f"Error getting thread root: {e}")
+            return timestamp  # Safe fallback
+    
+    def _get_message_content(self, channel, timestamp):
+        """
+        Get the content of a specific message.
+        Includes improved error handling for permission issues and enhanced debugging.
+        """
+        try:
+            self.log.info(f"📥 _get_message_content called with channel={channel}, timestamp={timestamp}")
+            
+            slack_client = getattr(self._bot, 'slack_web', None)
+            if not slack_client:
+                self.log.warning("❌ Slack client not available for getting message content")
+                return "Message content unavailable"
+            
+            # Try to get the message content directly first
+            target_ts = float(timestamp)
+            self.log.info(f"🔍 Trying conversations_history with target_ts={target_ts}")
+            
+            response = self._make_slack_api_call_with_retry(
+                slack_client,
+                'conversations_history',
+                channel=channel,
+                latest=str(target_ts + 1),
+                oldest=str(target_ts - 1),
+                limit=10,
+                inclusive=True
+            )
+            
+            self.log.info(f"📡 conversations_history response received: {response is not None}")
+            if response:
+                self.log.info(f"✓ Response ok: {response.get('ok')}")
+                if response.get('messages'):
+                    self.log.info(f"📨 Found {len(response.get('messages'))} messages")
+                    for i, msg in enumerate(response.get('messages')):
+                        msg_ts = msg.get('ts')
+                        msg_preview = msg.get('text', '')[:50]
+                        self.log.info(f"📝 Message {i}: ts={msg_ts}, text_preview='{msg_preview}...'")
+                        if msg_ts == timestamp:
+                            self.log.info(f"🎯 FOUND TARGET MESSAGE!")
+            
+            # Check for permission errors
+            if response and isinstance(response, dict) and response.get('error') == 'missing_scope':
+                needed_scopes = response.get('needed', 'conversations:history')
+                self.log.error(f"🔒 Permission error: Missing required scopes: {needed_scopes}")
+                return f"Permission error: Missing required scopes: {needed_scopes}"
+            
+            if response and response.get('messages'):
+                for msg in response['messages']:
+                    if msg.get('ts') == timestamp:
+                        message_text = msg.get('text', 'No message content')
+                        self.log.info(f"✅ Found matching message with text: {message_text}")
+                        return message_text
+            
+            self.log.warning("⚠️ Message not found in conversations_history, trying thread fallback")
+            
+            # Fallback: try to get from thread using a different approach
+            # Instead of getting thread root first, try conversations_replies directly
+            self.log.info(f"🔄 Trying conversations_replies directly with timestamp={timestamp}")
+            
+            direct_thread_response = self._make_slack_api_call_with_retry(
+                slack_client,
                 'conversations_replies',
                 channel=channel,
                 ts=timestamp
             )
             
-            if not thread_response or not thread_response.get('messages'):
-                self.log.warning(f"No messages found in thread {timestamp}")
-                return None
+            self.log.info(f"📡 Direct conversations_replies response received: {direct_thread_response is not None}")
+            if direct_thread_response:
+                self.log.info(f"✓ Response ok: {direct_thread_response.get('ok')}")
+                if direct_thread_response.get('messages'):
+                    self.log.info(f"📨 Found {len(direct_thread_response.get('messages'))} messages in direct thread call")
             
-            # Look through messages for bot messages with ticket info
-            for message in thread_response['messages']:
-                # Skip the original message
-                if message.get('ts') == timestamp:
-                    continue
-                
-                message_user = message.get('user')
-                message_bot_id = message.get('bot_id')
-                message_text = message.get('text', '')
-                
-                # Check if it's from our bot
-                is_our_bot_message = (
-                    message_user == bot_user_id or 
-                    (message_bot_id and hasattr(self._bot, '_bot_id') and message_bot_id == self._bot._bot_id)
-                )
-                
-                if is_our_bot_message and 'MOCK-OPS-' in message_text and 'ticket created' in message_text.lower():
-                    # Try to extract ticket info from message
-                    ticket_info = {}
-                    
-                    # Extract key
-                    import re
-                    key_match = re.search(r'MOCK-OPS-\d+', message_text)
-                    if key_match:
-                        ticket_info['key'] = key_match.group(0)
-                    else:
-                        continue
-                    
-                    # Extract URL if present
-                    url_match = re.search(r'https://[^\s]+', message_text)
-                    if url_match:
-                        ticket_info['url'] = url_match.group(0)
-                    else:
-                        ticket_info['url'] = f"https://yourcompany.atlassian.net/browse/{ticket_info['key']}"
-                    
-                    # Extract summary if present
-                    summary_match = re.search(r'Summary: (.+?)[\n\r]', message_text)
-                    if summary_match:
-                        ticket_info['summary'] = summary_match.group(1)
-                    else:
-                        ticket_info['summary'] = "Unknown summary"
-                    
-                    self.log.info(f"Found existing ticket: {ticket_info['key']}")
-                    return ticket_info
+            # Check for permission errors again
+            if direct_thread_response and isinstance(direct_thread_response, dict) and direct_thread_response.get('error') == 'missing_scope':
+                needed_scopes = direct_thread_response.get('needed', 'conversations:replies')
+                self.log.error(f"🔒 Permission error: Missing required scopes: {needed_scopes}")
+                return f"Permission error: Missing required scopes: {needed_scopes}"
             
-            self.log.info(f"No existing ticket found in thread {timestamp}")
-            return None
+            if direct_thread_response and direct_thread_response.get('messages'):
+                for msg in direct_thread_response['messages']:
+                    if msg.get('ts') == timestamp:
+                        message_text = msg.get('text', 'No message content')
+                        self.log.info(f"✅ Found matching message in direct thread call with text: {message_text}")
+                        return message_text
+            
+            self.log.warning("❌ Message not found in direct conversations_replies either")
+            return "Message content could not be retrieved"
             
         except Exception as e:
-            self.log.error(f"Error finding existing ticket: {e}")
-            return None
+            self.log.error(f"💥 Error getting message content: {e}")
+            return "Error retrieving message content"
+    
+    def _summarize_thread_replies(self, channel, timestamp):
+        """
+        Simple handler for :add2jira: reaction that echoes back the message content.
+        Includes permission error detection and enhanced debugging.
+        """
+        try:
+            self.log.info(f"🔄 _summarize_thread_replies called with channel={channel}, timestamp={timestamp}")
+            
+            slack_client = getattr(self._bot, 'slack_web', None)
+            if not slack_client:
+                self.log.warning("❌ Slack client not available for message retrieval")
+                return "Unable to retrieve message - Slack client unavailable"
+            
+            # Get the message content
+            self.log.info("📨 About to call _get_message_content")
+            message_content = self._get_message_content(channel, timestamp)
+            self.log.info(f"📋 _get_message_content returned: {message_content}")
+            
+            if message_content and message_content not in ["Message content could not be retrieved", "Error retrieving message content"]:
+                self.log.info(f"✅ Successfully retrieved message content: {message_content[:100]}...")
+                return f"Recorded the message: {message_content}"
+            elif "missing_scope" in str(message_content):
+                # Special handling for permission errors
+                self.log.error("🔒 Permission error detected in message content retrieval")
+                return "⚠️ PERMISSION ERROR: The bot lacks required permissions to read message content. Please check the bot's Slack token scopes and ensure 'conversations:history' and 'conversations:replies' are enabled."
+            else:
+                self.log.warning(f"⚠️ Could not retrieve message content for {timestamp}")
+                return "Could not record the message. Message content could not be retrieved."
+            
+        except Exception as e:
+            self.log.error(f"💥 Error processing message content: {e}")
+            if "missing_scope" in str(e) or "not_allowed_token_type" in str(e):
+                return "⚠️ PERMISSION ERROR: The bot lacks required permissions. Please update the bot's Slack token scopes."
+            return f"Error processing message: {str(e)}"
