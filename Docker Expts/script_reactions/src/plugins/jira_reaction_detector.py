@@ -6,12 +6,18 @@ import random
 
 class JiraReactionDetector(BotPlugin):
     """
-    Plugin to detect whether :jira: reactions are on root messages or replies.
+    Plugin to handle Jira-related reactions.
+    
+    Supported Reactions:
+    - :jira: - Creates mock MOCK-OPS tickets on root messages only
+    - :jirainreview: - Puts existing tickets in review status on root messages only
+    - :jiracloseticket: - Closes existing tickets on root messages only
     
     Features:
     - Strict message type detection (root vs reply)
+    - Duplicate ticket prevention
+    - Status change tracking with timestamps
     - Comprehensive error handling and logging
-    - Threaded responses indicating message type
     """
 
     def activate(self):
@@ -68,7 +74,7 @@ class JiraReactionDetector(BotPlugin):
         """
         try:
             reaction = event.get('reaction')
-            if reaction != 'jira':
+            if reaction not in ['jira', 'jirainreview', 'jiracloseticket']:
                 return False
             
             self.log.info(f"Handling {reaction} reaction: {json.dumps(event, indent=2)}")
@@ -86,19 +92,30 @@ class JiraReactionDetector(BotPlugin):
             # Determine if this is a root message or a reply
             is_reply = self._is_reply_message(channel, timestamp)
             
-            # Prepare response based on message type
-            if is_reply:
-                response_text = "No Action triggered - :jira: will work in root messages only."
-            else:
-                # Check if we've already created a ticket for this message
-                already_processed = self._check_if_already_processed(channel, timestamp)
-                
-                if already_processed:
-                    response_text = "ℹ️ MOCK-OPS ticket already exists for this message. Check the thread above for details."
+            # Handle different reactions
+            if reaction == 'jira':
+                if is_reply:
+                    response_text = "No Action triggered - :jira: will work in root messages only."
                 else:
-                    # Create mock ticket for root messages
-                    jira_ticket = self._create_mock_ops_ticket(channel, timestamp)
-                    response_text = f"✅ MOCK-OPS ticket created: {jira_ticket['key']}\n📋 Summary: {jira_ticket['summary']}\n🔗 Link: {jira_ticket['url']}\n⏰ Created: {jira_ticket['created_time']}"
+                    # Check if we've already created a ticket for this message
+                    already_processed = self._check_if_already_processed(channel, timestamp)
+                    
+                    if already_processed:
+                        response_text = "ℹ️ MOCK-OPS ticket already exists for this message. Check the thread above for details."
+                    else:
+                        # Create mock ticket for root messages
+                        jira_ticket = self._create_mock_ops_ticket(channel, timestamp)
+                        response_text = f"✅ MOCK-OPS ticket created: {jira_ticket['key']}\n📋 Summary: {jira_ticket['summary']}\n🔗 Link: {jira_ticket['url']}\n⏰ Created: {jira_ticket['created_time']}"
+            elif reaction == 'jirainreview':
+                if is_reply:
+                    response_text = "No Action triggered - :jirainreview: will work in root messages only."
+                else:
+                    response_text = self._handle_jira_in_review(channel, timestamp, user_id)
+            elif reaction == 'jiracloseticket':
+                if is_reply:
+                    response_text = "No Action triggered - :jiracloseticket: will work in root messages only."
+                else:
+                    response_text = self._handle_jira_close_ticket(channel, timestamp, user_id)
             
             # Send threaded response
             self._send_threaded_response(channel, timestamp, response_text)
@@ -420,4 +437,144 @@ class JiraReactionDetector(BotPlugin):
             
         except Exception as e:
             self.log.error(f"Error getting bot user ID: {e}")
+            return None
+    
+    def _handle_jira_in_review(self, channel, timestamp, user_id):
+        """
+        Handle :jirainreview: reaction to put a ticket in review status.
+        Only works on root messages with existing tickets.
+        """
+        try:
+            # First check if there's an existing ticket for this message
+            ticket_info = self._find_existing_ticket(channel, timestamp)
+            
+            if not ticket_info:
+                return "❌ No MOCK-OPS ticket found for this message. Please create a ticket with :jira: reaction first."
+            
+            # Mock updating the ticket status to "In Review"
+            ticket_key = ticket_info.get('key', 'UNKNOWN-TICKET')
+            update_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+            
+            # Create response with updated status
+            response_text = f"🔄 MOCK-OPS ticket {ticket_key} status updated to *In Review*\n"\
+                           f"👤 Changed by: <@{user_id}>\n"\
+                           f"⏰ Updated: {update_time}\n"\
+                           f"🔗 Link: {ticket_info.get('url', 'https://yourcompany.atlassian.net/browse/' + ticket_key)}"
+            
+            self.log.info(f"Updated ticket {ticket_key} to In Review status")
+            return response_text
+            
+        except Exception as e:
+            self.log.error(f"Error handling jirainreview reaction: {e}")
+            return f"❌ Error updating ticket status: {str(e)}"
+    
+    def _handle_jira_close_ticket(self, channel, timestamp, user_id):
+        """
+        Handle :jiracloseticket: reaction to close a ticket.
+        Only works on root messages with existing tickets.
+        """
+        try:
+            # First check if there's an existing ticket for this message
+            ticket_info = self._find_existing_ticket(channel, timestamp)
+            
+            if not ticket_info:
+                return "❌ No MOCK-OPS ticket found for this message. Please create a ticket with :jira: reaction first."
+            
+            # Mock closing the ticket
+            ticket_key = ticket_info.get('key', 'UNKNOWN-TICKET')
+            close_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+            
+            # Create response with closed status
+            response_text = f"✅ MOCK-OPS ticket {ticket_key} has been *Closed*\n"\
+                           f"👤 Closed by: <@{user_id}>\n"\
+                           f"⏰ Closed on: {close_time}\n"\
+                           f"🔍 Resolution: Fixed\n"\
+                           f"🔗 Link: {ticket_info.get('url', 'https://yourcompany.atlassian.net/browse/' + ticket_key)}"
+            
+            self.log.info(f"Closed ticket {ticket_key}")
+            return response_text
+            
+        except Exception as e:
+            self.log.error(f"Error handling jiracloseticket reaction: {e}")
+            return f"❌ Error closing ticket: {str(e)}"
+    
+    def _find_existing_ticket(self, channel, timestamp):
+        """
+        Find an existing ticket in a thread by scanning bot messages.
+        Returns ticket information if found, None otherwise.
+        """
+        try:
+            slack_client = getattr(self._bot, 'slack_web', None)
+            if not slack_client:
+                self.log.warning("Slack client not available for finding existing ticket")
+                return None
+            
+            # Get bot's user ID
+            bot_user_id = self._get_bot_user_id()
+            if not bot_user_id:
+                self.log.warning("Could not determine bot user ID")
+                return None
+            
+            # Get thread replies
+            thread_response = self._make_slack_api_call_with_retry(
+                slack_client, 
+                'conversations_replies',
+                channel=channel,
+                ts=timestamp
+            )
+            
+            if not thread_response or not thread_response.get('messages'):
+                self.log.warning(f"No messages found in thread {timestamp}")
+                return None
+            
+            # Look through messages for bot messages with ticket info
+            for message in thread_response['messages']:
+                # Skip the original message
+                if message.get('ts') == timestamp:
+                    continue
+                
+                message_user = message.get('user')
+                message_bot_id = message.get('bot_id')
+                message_text = message.get('text', '')
+                
+                # Check if it's from our bot
+                is_our_bot_message = (
+                    message_user == bot_user_id or 
+                    (message_bot_id and hasattr(self._bot, '_bot_id') and message_bot_id == self._bot._bot_id)
+                )
+                
+                if is_our_bot_message and 'MOCK-OPS-' in message_text and 'ticket created' in message_text.lower():
+                    # Try to extract ticket info from message
+                    ticket_info = {}
+                    
+                    # Extract key
+                    import re
+                    key_match = re.search(r'MOCK-OPS-\d+', message_text)
+                    if key_match:
+                        ticket_info['key'] = key_match.group(0)
+                    else:
+                        continue
+                    
+                    # Extract URL if present
+                    url_match = re.search(r'https://[^\s]+', message_text)
+                    if url_match:
+                        ticket_info['url'] = url_match.group(0)
+                    else:
+                        ticket_info['url'] = f"https://yourcompany.atlassian.net/browse/{ticket_info['key']}"
+                    
+                    # Extract summary if present
+                    summary_match = re.search(r'Summary: (.+?)[\n\r]', message_text)
+                    if summary_match:
+                        ticket_info['summary'] = summary_match.group(1)
+                    else:
+                        ticket_info['summary'] = "Unknown summary"
+                    
+                    self.log.info(f"Found existing ticket: {ticket_info['key']}")
+                    return ticket_info
+            
+            self.log.info(f"No existing ticket found in thread {timestamp}")
+            return None
+            
+        except Exception as e:
+            self.log.error(f"Error finding existing ticket: {e}")
             return None

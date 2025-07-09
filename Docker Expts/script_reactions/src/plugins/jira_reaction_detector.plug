@@ -3,4 +3,4 @@ Name = JiraReactionDetector
 Module = jira_reaction_detector
 
 [Documentation]
-Description = Plugin to detect whether :jira: reactions are on root messages or replies
+Description = Plugin to handle Jira-related reactions with mock ticket creation and status updates
