@@ -1,6 +1,0 @@
-[Core]
-Name = JiraReactionDetector
-Module = jira_reaction_detector
-
-[Documentation]
-Description = Plugin to handle Jira-related reactions with mock ticket creation and status updates
