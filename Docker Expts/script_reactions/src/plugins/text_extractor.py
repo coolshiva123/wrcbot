@@ -26,6 +26,10 @@ class TextExtractor(BotPlugin):
         Usage: textract
         """
         try:
+            import time
+            self.log.info("⏳ Adding delay to avoid rate limiting...")
+            time.sleep(5)  # Add a 5 second delay to help avoid rate limiting
+            
             self.log.info("🚀 TEXTRACT COMMAND INVOKED")
             
             # Get message context
