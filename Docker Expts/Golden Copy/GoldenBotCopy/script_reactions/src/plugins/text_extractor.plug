@@ -1,0 +1,6 @@
+[Core]
+Name = TextExtractor
+Module = text_extractor
+
+[Documentation]
+Description = Plugin to extract all messages from a Slack thread and create a text file with the textract command

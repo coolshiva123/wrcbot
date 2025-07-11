@@ -1,0 +1,16 @@
+[Core]
+Name = JiraReactionMocker
+Module = jira_reaction_mocker
+
+[Documentation]
+Description = Plugin to mock Jira ticket operations via Slack reactions.
+             :jira: - Create ticket (root only)
+             :jirainreview: - Move to review (root only) 
+             :jiracloseticket: - Close ticket (root only)
+             :add2jira: - Add comments (replies only)
+             
+             Redis keys: Uses JIRA ticket ID (MOCK-OPS-XXXX) as primary key
+             Thread mapping: thread_to_ticket_{timestamp} -> MOCK-OPS-XXXX
+             
+             Rate Limiting: 2s delay per reaction (configurable in code)
+             API Fallback: Progressive limits 50→20→10 messages
