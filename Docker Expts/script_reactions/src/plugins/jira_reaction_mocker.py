@@ -4,6 +4,61 @@ import time
 import re
 import random
 
+CLOSURE_FORM_BLOCKS = [
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":memo: Enter the *Ticket Closure Summary*"
+        }
+    },
+    {
+        "type": "input",
+        "block_id": "ticket_closure_input_block",
+        "element": {
+            "type": "plain_text_input",
+            "action_id": "closure_input_action",
+            "multiline": True,
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Enter closure summary..."
+            }
+        },
+        "label": {
+            "type": "plain_text",
+            "text": "Summary",
+            "emoji": True
+        }
+    },
+    {
+        "type": "actions",
+        "block_id": "ticket_closure_actions_block",
+        "elements": [
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Close Ticket",
+                    "emoji": True
+                },
+                "value": "close_ticket",
+                "action_id": "close_ticket_action",
+                "style": "primary"
+            },
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Cancel",
+                    "emoji": True
+                },
+                "value": "cancel",
+                "action_id": "close_ticket_cancel"
+            }
+        ]
+    }
+]
+
 
 class JiraReactionMocker(BotPlugin):
     """
@@ -236,7 +291,7 @@ class JiraReactionMocker(BotPlugin):
             return True
 
     def _handle_jira_close(self, channel, ts, thread_ts, is_root, user_id):
-        """Handle :jiraticketclose: reaction - close ticket."""
+        """Handle :jiraticketclose: reaction - show closure form and close ticket."""
         try:
             if not is_root:
                 self._post_error_message(channel, ts, "❌ :jiracloseticket: can only be used on root messages.")
@@ -259,15 +314,28 @@ class JiraReactionMocker(BotPlugin):
                 self._post_error_message(channel, ts, f"❌ {ticket_data['key']} is already closed.")
                 return True
             
-            # Update ticket status
-            ticket_data['status'] = 'Closed'
-            ticket_data['closed_by'] = user_id
-            ticket_data['closed_at'] = datetime.datetime.now().isoformat()
-            self[ticket_key] = ticket_data
+            # Show the closure form
+            closure_blocks = CLOSURE_FORM_BLOCKS.copy()
+            # Add ticket context
+            closure_blocks.insert(0, {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Closing ticket:* {ticket_data['key']}"
+                }
+            })
             
-            success_msg = f"✅ {ticket_data['key']} → Closed"
-            self._post_success_message(channel, ts, success_msg)
-            self.log.info(f"Closed ticket {ticket_data['key']}")
+            response = self._send_blocks(blocks=closure_blocks, text="Enter closure summary", channel=channel, thread_ts=ts)
+            if not response:
+                self._post_error_message(channel, ts, "❌ Failed to show closure form")
+                return True
+                
+            self.log.info(f"Showed closure form for {ticket_data['key']}")
+            return True
+            
+        except Exception as e:
+            self.log.error(f"Error handling jira close: {e}")
+            return False
             return True
             
         except Exception as e:
@@ -500,3 +568,154 @@ class JiraReactionMocker(BotPlugin):
                 )
         except Exception as e:
             self.log.error(f"Error posting success message: {e}")
+
+    def _send_blocks(self, blocks=None, text="", channel=None, thread_ts=None):
+        """Helper to send blocks with proper channel formatting"""
+        slack_client = self._get_slack_client()
+        if not slack_client:
+            self.log.warning("Slack client not available")
+            return None
+        
+        try:
+            response = slack_client.chat_postMessage(
+                channel=channel,
+                blocks=blocks,
+                text=text,
+                thread_ts=thread_ts
+            )
+            self.log.info(f"Successfully sent blocks message")
+            return response
+        except Exception as e:
+            self.log.error(f"Failed to send blocks: {e}")
+            return None
+    
+    def _update_message(self, blocks=None, text="", channel=None, ts=None):
+        """Helper to update/replace a message"""
+        slack_client = self._get_slack_client()
+        if not slack_client:
+            self.log.warning("Slack client not available")
+            return False
+        
+        try:
+            slack_client.chat_update(
+                channel=channel,
+                ts=ts,
+                blocks=blocks or [],
+                text=text
+            )
+            return True
+        except Exception as e:
+            self.log.error(f"Failed to update message: {e}")
+            return False
+
+    def handle_block_action(self, action_id, value, payload, message):
+        """Handle block actions for ticket closure form"""
+        try:
+            self.log.info(f"Handling block action: action_id={action_id}")
+            
+            if action_id not in ['close_ticket_action', 'close_ticket_cancel']:
+                return
+            
+            channel = payload.get('channel', {}).get('id')
+            message_ts = payload.get('container', {}).get('message_ts')
+            
+            # Get thread_ts from payload for block submissions
+            thread_ts = payload.get('message', {}).get('thread_ts')
+            if not thread_ts:
+                # Fallback to message metadata if not in payload
+                if hasattr(message, 'thread_ts'):
+                    thread_ts = message.thread_ts
+                elif isinstance(message, dict):
+                    thread_ts = message.get('thread_ts')
+                
+                # Final fallback to the original message ts
+                if not thread_ts:
+                    thread_ts = message_ts
+            
+            self.log.info(f"Processing block action with thread_ts={thread_ts}, message_ts={message_ts}")
+            user_id = payload.get('user', {}).get('id')
+            
+            if action_id == 'close_ticket_cancel':
+                # Remove the form
+                self._update_message(blocks=[], text="Ticket closure cancelled", channel=channel, ts=message_ts)
+                return
+            
+            if action_id == 'close_ticket_action':
+                # Get the closure summary
+                state_values = payload.get('state', {}).get('values', {})
+                closure_summary = None
+                
+                for block_data in state_values.values():
+                    if 'closure_input_action' in block_data:
+                        closure_summary = block_data['closure_input_action'].get('value', '').strip()
+                        break
+                
+                if not closure_summary:
+                    self._update_message(
+                        blocks=[],
+                        text="❌ Closure summary cannot be empty",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                # Get ticket data
+                thread_mapping_key = f"thread_to_ticket_{thread_ts}"
+                ticket_key = self.get(thread_mapping_key)
+                
+                if not ticket_key:
+                    self._update_message(
+                        blocks=[],
+                        text="❌ No JIRA ticket found in this thread",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                ticket_data = self.get(ticket_key)
+                if not ticket_data:
+                    self._update_message(
+                        blocks=[],
+                        text="❌ JIRA ticket data not found",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                if ticket_data['status'] == 'Closed':
+                    self._update_message(
+                        blocks=[],
+                        text=f"❌ {ticket_data['key']} is already closed",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                # Update ticket with closure info
+                ticket_data['status'] = 'Closed'
+                ticket_data['closed_by'] = user_id
+                ticket_data['closed_at'] = datetime.datetime.now().isoformat()
+                ticket_data['closure_summary'] = closure_summary
+                self[ticket_key] = ticket_data
+                
+                # Update the message to show mock JIRA closure and summary
+                user_name = self._get_user_display_name(user_id)
+                current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                success_msg = (
+                    f"✅ {ticket_data['key']} → Closed\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"*JIRA Ticket Closure*\n"
+                    f"• *Ticket:* {ticket_data['key']}\n"
+                    f"• *Title:* {ticket_data['title']}\n"
+                    f"• *Closed by:* @{user_name}\n"
+                    f"• *Closed at:* {current_time}\n"
+                    f"• *Closure Summary:*\n{closure_summary}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+                self._update_message(blocks=[], text=success_msg, channel=channel, ts=message_ts)
+                self.log.info(f"Closed ticket {ticket_data['key']} with summary")
+                
+        except Exception as e:
+            self.log.error(f"Error handling block action: {e}")
+            return False
