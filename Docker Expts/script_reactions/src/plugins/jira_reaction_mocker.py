@@ -9,20 +9,12 @@ class JiraReactionMocker(BotPlugin):
     """
     Plugin to mock Jira ticket operations via Slack reactions.
     
-    Reactions:
-    - :jira: (root only) - Create a mock Jira ticket
-    - :jirainreview: (root only) - Move ticket to "In Review" status  
-    - :jiracloseticket: (root only) - Close the ticket
-    - :add2jira: (replies only) - Add thread replies as comments to ticket
-    
-    Rate Limiting Configuration:
-    - REACTION_DELAY: Delay after receiving a reaction (default: 2 seconds)
-    - API_RETRY_DELAY: Delay between API retries (default: 10 seconds)
+    Reactions: :jira: (create), :jirainreview: (review), :jiracloseticket: (close), :add2jira: (add comments)
     """
     
-    # Rate limiting configuration - easily adjustable
-    REACTION_DELAY = 3  # Seconds to wait after receiving a reaction (increased)
-    API_RETRY_DELAY = 10  # Seconds to wait between API retries (increased for rate limiting)
+    # Rate limiting configuration
+    REACTION_DELAY = 3
+    API_RETRY_DELAY = 10
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -85,15 +77,6 @@ class JiraReactionMocker(BotPlugin):
             
             self.log.info(f"Processing {reaction} reaction: is_root={is_root}, thread_ts={thread_ts}, message_ts={ts}")
             
-            # If we couldn't determine thread context from message, try to infer from Slack API
-            if not message_thread_ts and reaction in ['add2jira']:
-                # For add2jira, we need to check if this message is actually in a thread
-                thread_check = self._check_if_message_in_thread(channel, ts)
-                if thread_check:
-                    is_root = False
-                    thread_ts = thread_check
-                    self.log.info(f"Corrected thread detection: is_root={is_root}, thread_ts={thread_ts}")
-            
             # Route to appropriate handler
             if reaction == 'jira':
                 return self._handle_jira_create(channel, ts, thread_ts, is_root, user_id, message_info)
@@ -115,103 +98,37 @@ class JiraReactionMocker(BotPlugin):
             if not slack_client:
                 return None
             
-            # First try conversations_replies in case it's in a thread
+            # Try conversations_replies first
             try:
-                reply_response = slack_client.conversations_replies(
-                    channel=channel,
-                    ts=ts,
-                    limit=1,
-                    inclusive=True
-                )
-                
-                if reply_response.get('ok') and reply_response.get('messages'):
-                    # Find the exact message with matching timestamp
-                    for msg in reply_response['messages']:
-                        if msg.get('ts') == ts:
-                            self.log.info(f"✅ Found message via conversations_replies")
-                            return msg
-            except Exception as e:
-                self.log.warning(f"conversations_replies failed: {e}")
-            
-            # Fallback: try conversations_history with a time window
-            try:
-                target_ts = float(ts)
-                # Use a small time window around the target timestamp
-                start_time = str(target_ts - 1)  # 1 second before
-                end_time = str(target_ts + 1)    # 1 second after
-                
-                response = slack_client.conversations_history(
-                    channel=channel,
-                    oldest=start_time,
-                    latest=end_time,
-                    inclusive=True,
-                    limit=10
-                )
-                
+                response = slack_client.conversations_replies(channel=channel, ts=ts, limit=1, inclusive=True)
                 if response.get('ok') and response.get('messages'):
-                    # Find the exact message with matching timestamp
                     for msg in response['messages']:
                         if msg.get('ts') == ts:
-                            self.log.info(f"✅ Found message via conversations_history")
+                            self.log.info("✅ Found message via conversations_replies")
                             return msg
-                    
-                    self.log.warning(f"Message {ts} not found in history results")
-                else:
-                    self.log.warning(f"conversations_history failed: {response.get('error', 'unknown error') if response else 'no response'}")
-            except Exception as e:
-                self.log.warning(f"conversations_history failed: {e}")
+            except Exception:
+                pass
             
-            # Final fallback: create a minimal message object
-            self.log.warning(f"Could not fetch message {ts} from API, creating minimal object")
-            return {
-                'ts': ts,
-                'text': 'Message text unavailable',
-                'user': 'unknown',
-                'thread_ts': None  # We'll determine this from the reaction event context
-            }
+            # Fallback: conversations_history
+            try:
+                target_ts = float(ts)
+                response = slack_client.conversations_history(
+                    channel=channel, oldest=str(target_ts - 1), latest=str(target_ts + 1), 
+                    inclusive=True, limit=10
+                )
+                if response.get('ok') and response.get('messages'):
+                    for msg in response['messages']:
+                        if msg.get('ts') == ts:
+                            self.log.info("✅ Found message via conversations_history")
+                            return msg
+            except Exception:
+                pass
+            
+            # Minimal fallback
+            return {'ts': ts, 'text': 'Message text unavailable', 'user': 'unknown', 'thread_ts': None}
                 
         except Exception as e:
             self.log.error(f"Error getting message info: {e}")
-            return None
-
-    def _check_if_message_in_thread(self, channel, ts):
-        """Check if a message is part of a thread and return the thread root timestamp."""
-        try:
-            slack_client = self._get_slack_client()
-            if not slack_client:
-                return None
-            
-            # Get a broader conversation history to see thread context
-            target_ts = float(ts)
-            start_time = str(target_ts - 3600)  # Look 1 hour back
-            end_time = str(target_ts + 60)      # Look 1 minute forward
-            
-            response = slack_client.conversations_history(
-                channel=channel,
-                oldest=start_time,
-                latest=end_time,
-                inclusive=True,
-                limit=100
-            )
-            
-            if response.get('ok') and response.get('messages'):
-                for msg in response['messages']:
-                    # Check if our target message appears as a thread reply
-                    if msg.get('ts') == ts and msg.get('thread_ts'):
-                        return msg.get('thread_ts')
-                        
-                    # Check if our target message has replies (making it a thread root)
-                    if msg.get('ts') == ts and msg.get('reply_count', 0) > 0:
-                        return ts  # It's a thread root
-                        
-                    # Check if there are messages that reference our ts as thread_ts
-                    if msg.get('thread_ts') == ts:
-                        return ts  # Our message is a thread root
-                        
-            return None
-            
-        except Exception as e:
-            self.log.warning(f"Error checking thread context: {e}")
             return None
 
     def _get_slack_client(self):
@@ -228,7 +145,7 @@ class JiraReactionMocker(BotPlugin):
         """Handle :jira: reaction - create mock ticket."""
         try:
             if not is_root:
-                self._post_error_message(channel, ts, "❌ :jira: reaction can only be used on root messages, not replies.")
+                self._post_error_message(channel, ts, "❌ :jira: reaction can only be used on root messages.")
                 return True
             
             # Check if ticket already exists for this thread
@@ -238,7 +155,7 @@ class JiraReactionMocker(BotPlugin):
             if existing_ticket_key:
                 existing_ticket = self.get(existing_ticket_key)
                 if existing_ticket:
-                    self._post_error_message(channel, ts, f"❌ JIRA ticket already exists for this thread: {existing_ticket['key']}")
+                    self._post_error_message(channel, ts, f"❌ Ticket already exists: {existing_ticket['key']}")
                     return True
             
             # Create mock ticket
@@ -267,12 +184,8 @@ class JiraReactionMocker(BotPlugin):
             # Create thread mapping for lookup
             self[thread_mapping_key] = jira_ticket_key
             
-            # Post success message
-            success_msg = (f"✅ MOCK-OPS ticket created: {ticket_data['key']}\n"
-                          f"**Title:** {ticket_title}\n"
-                          f"**Status:** Open\n"
-                          f"**URL:** https://yourcompany.atlassian.net/browse/{ticket_data['key']}")
-            
+            # Post concise success message
+            success_msg = f"✅ Created: {ticket_data['key']} - {ticket_title[:50]}{'...' if len(ticket_title) > 50 else ''}"
             self._post_success_message(channel, ts, success_msg)
             self.log.info(f"Created ticket {ticket_data['key']} for thread {thread_ts}")
             return True
@@ -286,7 +199,7 @@ class JiraReactionMocker(BotPlugin):
         """Handle :jirainreview: reaction - move ticket to review."""
         try:
             if not is_root:
-                self._post_error_message(channel, ts, "❌ :jirainreview: reaction can only be used on root messages, not replies.")
+                self._post_error_message(channel, ts, "❌ :jirainreview: can only be used on root messages.")
                 return True
             
             # Get existing ticket
@@ -302,12 +215,8 @@ class JiraReactionMocker(BotPlugin):
                 self._post_error_message(channel, ts, "❌ JIRA ticket data not found.")
                 return True
             
-            if ticket_data['status'] == 'In Review':
-                self._post_error_message(channel, ts, f"❌ Ticket {ticket_data['key']} is already in review.")
-                return True
-                
-            if ticket_data['status'] == 'Closed':
-                self._post_error_message(channel, ts, f"❌ Ticket {ticket_data['key']} is already closed.")
+            if ticket_data['status'] in ['In Review', 'Closed']:
+                self._post_error_message(channel, ts, f"❌ {ticket_data['key']} is already {ticket_data['status'].lower()}.")
                 return True
             
             # Update ticket status
@@ -316,10 +225,7 @@ class JiraReactionMocker(BotPlugin):
             ticket_data['reviewed_at'] = datetime.datetime.now().isoformat()
             self[ticket_key] = ticket_data
             
-            success_msg = (f"✅ JIRA ticket moved to review: {ticket_data['key']}\n"
-                          f"**Status:** In Review\n"
-                          f"**URL:** https://yourcompany.atlassian.net/browse/{ticket_data['key']}")
-            
+            success_msg = f"✅ {ticket_data['key']} → In Review"
             self._post_success_message(channel, ts, success_msg)
             self.log.info(f"Moved ticket {ticket_data['key']} to In Review")
             return True
@@ -333,7 +239,7 @@ class JiraReactionMocker(BotPlugin):
         """Handle :jiraticketclose: reaction - close ticket."""
         try:
             if not is_root:
-                self._post_error_message(channel, ts, "❌ :jiracloseticket: reaction can only be used on root messages, not replies.")
+                self._post_error_message(channel, ts, "❌ :jiracloseticket: can only be used on root messages.")
                 return True
             
             # Get existing ticket
@@ -350,7 +256,7 @@ class JiraReactionMocker(BotPlugin):
                 return True
             
             if ticket_data['status'] == 'Closed':
-                self._post_error_message(channel, ts, f"❌ Ticket {ticket_data['key']} is already closed.")
+                self._post_error_message(channel, ts, f"❌ {ticket_data['key']} is already closed.")
                 return True
             
             # Update ticket status
@@ -359,10 +265,7 @@ class JiraReactionMocker(BotPlugin):
             ticket_data['closed_at'] = datetime.datetime.now().isoformat()
             self[ticket_key] = ticket_data
             
-            success_msg = (f"✅ JIRA ticket closed: {ticket_data['key']}\n"
-                          f"**Status:** *Closed*\n"
-                          f"**URL:** https://yourcompany.atlassian.net/browse/{ticket_data['key']}")
-            
+            success_msg = f"✅ {ticket_data['key']} → Closed"
             self._post_success_message(channel, ts, success_msg)
             self.log.info(f"Closed ticket {ticket_data['key']}")
             return True
@@ -376,7 +279,7 @@ class JiraReactionMocker(BotPlugin):
         """Handle :add2jira: reaction - add replies as comments."""
         try:
             if is_root:
-                self._post_error_message(channel, ts, "❌ :add2jira: reaction can only be used on replies, not root messages.")
+                self._post_error_message(channel, ts, "❌ :add2jira: can only be used on replies.")
                 return True
             
             # Get existing ticket
@@ -416,7 +319,7 @@ class JiraReactionMocker(BotPlugin):
                               and msg.get('user') != self._bot_user_id]  # Exclude bot messages
             
             if not new_replies:
-                self._post_error_message(channel, ts, "❌ No new user comments to add to JIRA. Bot messages are excluded from comments.")
+                self._post_error_message(channel, ts, "❌ No new comments to add (bot messages excluded).")
                 return True
             
             # Format replies as comments
@@ -444,25 +347,9 @@ class JiraReactionMocker(BotPlugin):
             ticket_data['last_add2jira_ts'] = ts
             self[ticket_key] = ticket_data
             
-            # Create detailed comment summary
-            comment_summary = []
-            for i, comment in enumerate(comments, 1):
-                comment_preview = comment['text'][:50] + "..." if len(comment['text']) > 50 else comment['text']
-                comment_summary.append(f"{i}. **{comment['author']}**: {comment_preview}")
-            
-            success_msg = (f"✅ Added {len(comments)} user comments to JIRA ticket: {ticket_data['key']}\n"
-                          f"**Total comments:** {len(ticket_data['comments'])}\n"
-                          f"**URL:** https://yourcompany.atlassian.net/browse/{ticket_data['key']}\n\n"
-                          f"**Comments added:**\n" + "\n".join(comment_summary))
-            
+            # Create concise summary
+            success_msg = f"✅ Added {len(comments)} comments to {ticket_data['key']}"
             self._post_success_message(channel, ts, success_msg)
-            
-            # Also post the full comments as a threaded reply for reference
-            if comments:
-                full_comments_msg = f"📝 **Full JIRA Comments Added:**\n\n"
-                for comment in comments:
-                    full_comments_msg += f"**{comment['author']}** ({comment['timestamp']}):\n{comment['text']}\n\n"
-                self._post_success_message(channel, ts, full_comments_msg)
             
             self.log.info(f"Added {len(comments)} comments to ticket {ticket_data['key']}")
             return True
@@ -477,72 +364,47 @@ class JiraReactionMocker(BotPlugin):
         try:
             slack_client = self._get_slack_client()
             if not slack_client:
-                self.log.error("Slack client not available for getting thread replies")
                 return None
             
-            self.log.info(f"Getting thread replies for channel={channel}, thread_ts={thread_ts}")
+            time.sleep(2)  # Rate limiting delay
             
-            # Add initial delay to prevent rate limiting
-            time.sleep(2)
-            
-            # Try with smaller limit first with exponential backoff
+            # Try with exponential backoff
             attempt = 0
             for limit in [50, 20, 10]:
                 attempt += 1
                 try:
-                    # Progressive delay for subsequent attempts
                     if attempt > 1:
                         delay = self.API_RETRY_DELAY * (attempt - 1)
-                        self.log.info(f"Waiting {delay} seconds before attempt {attempt} with limit={limit}")
                         time.sleep(delay)
                         
-                    self.log.info(f"Trying conversations_replies with limit={limit} (attempt {attempt})")
                     response = slack_client.conversations_replies(
-                        channel=channel,
-                        ts=thread_ts,
-                        limit=limit,
-                        inclusive=True
+                        channel=channel, ts=thread_ts, limit=limit, inclusive=True
                     )
                     
-                    self.log.info(f"conversations_replies response: ok={response.get('ok')}, error={response.get('error')}")
-                    
                     if response.get('ok') and response.get('messages'):
-                        # Filter out the root message, return only replies
                         messages = response['messages']
                         replies = [msg for msg in messages if msg.get('ts') != thread_ts]
-                        self.log.info(f"Found {len(replies)} replies in thread (limit={limit})")
                         return replies
                     elif response.get('error'):
                         error_type = response.get('error')
-                        self.log.warning(f"API error with limit {limit}: {error_type}")
                         if error_type in ['rate_limited', 'ratelimited']:
-                            self.log.info(f"Rate limited, waiting {self.API_RETRY_DELAY} seconds before next attempt")
-                            time.sleep(self.API_RETRY_DELAY)  # Wait before trying smaller limit
+                            time.sleep(self.API_RETRY_DELAY)
                             continue
-                        elif limit == 10:  # Last attempt failed
-                            self.log.error(f"All attempts failed. Final error: {error_type}")
+                        elif limit == 10:
                             return None
                     else:
-                        self.log.warning(f"No messages returned with limit {limit}")
-                        break  # No point trying smaller limits
+                        break
                         
                 except Exception as api_error:
-                    error_msg = str(api_error)
-                    self.log.error(f"Exception with limit {limit}: {api_error}")
-                    
-                    # Check if this is a rate limiting error
-                    if 'ratelimited' in error_msg.lower() or 'rate_limited' in error_msg.lower():
-                        self.log.info(f"Rate limiting exception detected, waiting {self.API_RETRY_DELAY} seconds before next attempt")
+                    if 'ratelimited' in str(api_error).lower():
                         time.sleep(self.API_RETRY_DELAY)
-                    
-                    if limit == 10:  # Last attempt
+                    if limit == 10:
                         return None
                     continue
             
             return None
                 
-        except Exception as e:
-            self.log.error(f"Error getting thread replies: {e}")
+        except Exception:
             return None
 
     def _get_user_display_name(self, user_id):
