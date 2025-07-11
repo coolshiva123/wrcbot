@@ -59,6 +59,61 @@ CLOSURE_FORM_BLOCKS = [
     }
 ]
 
+REVIEW_FORM_BLOCKS = [
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":mag: Enter the *Review Summary*"
+        }
+    },
+    {
+        "type": "input",
+        "block_id": "review_summary_input_block",
+        "element": {
+            "type": "plain_text_input",
+            "action_id": "review_input_action",
+            "multiline": True,
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Enter review summary..."
+            }
+        },
+        "label": {
+            "type": "plain_text",
+            "text": "Review Summary",
+            "emoji": True
+        }
+    },
+    {
+        "type": "actions",
+        "block_id": "review_summary_actions_block",
+        "elements": [
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Mark In Review",
+                    "emoji": True
+                },
+                "value": "mark_in_review",
+                "action_id": "mark_in_review_action",
+                "style": "primary"
+            },
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Cancel",
+                    "emoji": True
+                },
+                "value": "cancel",
+                "action_id": "review_cancel"
+            }
+        ]
+    }
+]
+
 
 class JiraReactionMocker(BotPlugin):
     """
@@ -251,7 +306,7 @@ class JiraReactionMocker(BotPlugin):
             return True
 
     def _handle_jira_review(self, channel, ts, thread_ts, is_root, user_id):
-        """Handle :jirainreview: reaction - move ticket to review."""
+        """Handle :jirainreview: reaction - show review form and mark ticket in review."""
         try:
             if not is_root:
                 self._post_error_message(channel, ts, "❌ :jirainreview: can only be used on root messages.")
@@ -274,21 +329,27 @@ class JiraReactionMocker(BotPlugin):
                 self._post_error_message(channel, ts, f"❌ {ticket_data['key']} is already {ticket_data['status'].lower()}.")
                 return True
             
-            # Update ticket status
-            ticket_data['status'] = 'In Review'
-            ticket_data['reviewed_by'] = user_id
-            ticket_data['reviewed_at'] = datetime.datetime.now().isoformat()
-            self[ticket_key] = ticket_data
+            # Show the review form
+            review_blocks = REVIEW_FORM_BLOCKS.copy()
+            review_blocks.insert(0, {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Marking ticket In Review:* {ticket_data['key']}"
+                }
+            })
             
-            success_msg = f"✅ {ticket_data['key']} → In Review"
-            self._post_success_message(channel, ts, success_msg)
-            self.log.info(f"Moved ticket {ticket_data['key']} to In Review")
+            response = self._send_blocks(blocks=review_blocks, text="Enter review summary", channel=channel, thread_ts=ts)
+            if not response:
+                self._post_error_message(channel, ts, "❌ Failed to show review form")
+                return True
+                
+            self.log.info(f"Showed review form for {ticket_data['key']}")
             return True
             
         except Exception as e:
-            self.log.error(f"Error moving ticket to review: {e}")
-            self._post_error_message(channel, ts, f"❌ Error moving ticket to review: {str(e)}")
-            return True
+            self.log.error(f"Error handling jira review: {e}")
+            return False
 
     def _handle_jira_close(self, channel, ts, thread_ts, is_root, user_id):
         """Handle :jiraticketclose: reaction - show closure form and close ticket."""
@@ -609,11 +670,13 @@ class JiraReactionMocker(BotPlugin):
             return False
 
     def handle_block_action(self, action_id, value, payload, message):
-        """Handle block actions for ticket closure form"""
+        """Handle block actions for ticket closure and review forms"""
         try:
             self.log.info(f"Handling block action: action_id={action_id}")
             
-            if action_id not in ['close_ticket_action', 'close_ticket_cancel']:
+            if action_id not in [
+                'close_ticket_action', 'close_ticket_cancel',
+                'mark_in_review_action', 'review_cancel']:
                 return
             
             channel = payload.get('channel', {}).get('id')
@@ -622,22 +685,18 @@ class JiraReactionMocker(BotPlugin):
             # Get thread_ts from payload for block submissions
             thread_ts = payload.get('message', {}).get('thread_ts')
             if not thread_ts:
-                # Fallback to message metadata if not in payload
                 if hasattr(message, 'thread_ts'):
                     thread_ts = message.thread_ts
                 elif isinstance(message, dict):
                     thread_ts = message.get('thread_ts')
-                
-                # Final fallback to the original message ts
                 if not thread_ts:
                     thread_ts = message_ts
-            
             self.log.info(f"Processing block action with thread_ts={thread_ts}, message_ts={message_ts}")
             user_id = payload.get('user', {}).get('id')
             
-            if action_id == 'close_ticket_cancel':
+            if action_id == 'close_ticket_cancel' or action_id == 'review_cancel':
                 # Remove the form
-                self._update_message(blocks=[], text="Ticket closure cancelled", channel=channel, ts=message_ts)
+                self._update_message(blocks=[], text="Action cancelled", channel=channel, ts=message_ts)
                 return
             
             if action_id == 'close_ticket_action':
@@ -716,6 +775,84 @@ class JiraReactionMocker(BotPlugin):
                 self._update_message(blocks=[], text=success_msg, channel=channel, ts=message_ts)
                 self.log.info(f"Closed ticket {ticket_data['key']} with summary")
                 
+                return
+            
+            if action_id == 'mark_in_review_action':
+                # Get the review summary
+                state_values = payload.get('state', {}).get('values', {})
+                review_summary = None
+                for block_data in state_values.values():
+                    if 'review_input_action' in block_data:
+                        review_summary = block_data['review_input_action'].get('value', '').strip()
+                        break
+                
+                if not review_summary:
+                    self._update_message(
+                        blocks=[],
+                        text="❌ Review summary cannot be empty",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                # Get ticket data
+                thread_mapping_key = f"thread_to_ticket_{thread_ts}"
+                ticket_key = self.get(thread_mapping_key)
+                
+                if not ticket_key:
+                    self._update_message(
+                        blocks=[],
+                        text="❌ No JIRA ticket found in this thread",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                ticket_data = self.get(ticket_key)
+                if not ticket_data:
+                    self._update_message(
+                        blocks=[],
+                        text="❌ JIRA ticket data not found",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                if ticket_data['status'] in ['In Review', 'Closed']:
+                    self._update_message(
+                        blocks=[],
+                        text=f"❌ {ticket_data['key']} is already {ticket_data['status'].lower()}",
+                        channel=channel,
+                        ts=message_ts
+                    )
+                    return
+                
+                # Update ticket with review info
+                ticket_data['status'] = 'In Review'
+                ticket_data['reviewed_by'] = user_id
+                ticket_data['reviewed_at'] = datetime.datetime.now().isoformat()
+                ticket_data['review_summary'] = review_summary
+                self[ticket_key] = ticket_data
+                
+                # Update the message to show mock JIRA review and summary
+                user_name = self._get_user_display_name(user_id)
+                current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                success_msg = (
+                    f"🔄 {ticket_data['key']} → In Review\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"*JIRA Ticket Review*\n"
+                    f"• *Ticket:* {ticket_data['key']}\n"
+                    f"• *Title:* {ticket_data['title']}\n"
+                    f"• *Reviewed by:* @{user_name}\n"
+                    f"• *Reviewed at:* {current_time}\n"
+                    f"• *Review Summary:*\n{review_summary}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+                self._update_message(blocks=[], text=success_msg, channel=channel, ts=message_ts)
+                self.log.info(f"Marked ticket {ticket_data['key']} as In Review with summary")
+                return
+
         except Exception as e:
             self.log.error(f"Error handling block action: {e}")
             return False
