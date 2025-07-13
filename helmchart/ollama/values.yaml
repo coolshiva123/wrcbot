@@ -1,0 +1,9 @@
+replicaCount: 1
+image:
+  repository: ollama
+  tag: "0.1"
+  pullPolicy: IfNotPresent
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

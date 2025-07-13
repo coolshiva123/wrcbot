@@ -1,0 +1,9 @@
+[Core]
+Name = SlackV3BlocksExtension
+Module = slackv3_blocks_extension
+
+[Documentation]
+Description = Extension for SlackV3 backend to support Slack blocks and interactive components via websocket
+
+[Python]
+Version = 3.6.0

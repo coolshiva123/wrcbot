@@ -1,0 +1,4 @@
+[Core]
+Name = SlackV3ReactionsExtension
+Module = slackv3_reactions_extension
+Core = yes

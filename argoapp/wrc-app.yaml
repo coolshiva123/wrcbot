@@ -11,7 +11,7 @@ spec:
     path: argoapp
     directory:
       recurse: false  # Don't recurse into subdirectories
-      include: '{redisapp.yaml,rabbitmqapp.yaml,vaultapp.yaml,wrcbotapp.yaml}'  # Added huggingface Helm chart manifest
+      include: '{redisapp.yaml,rabbitmqapp.yaml,vaultapp.yaml,wrcbotapp.yaml,ollama-app.yaml}'  # Added huggingface Helm chart manifest
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

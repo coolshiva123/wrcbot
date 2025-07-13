@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ollama
+version: 0.1.0
+description: Helm chart for Ollama with llama3
+appVersion: "0.1"
