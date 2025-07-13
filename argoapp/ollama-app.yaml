@@ -1,14 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: ollama
+  name: ollama-app
   namespace: argocd
 spec:
   project: wrcbot
   source:
-    path: helmchart/ollama
     repoURL: 'https://github.com/coolshiva123/wrcbot.git'
     targetRevision: HEAD
+    path: helmchart/ollama
     helm:
       valueFiles:
         - values.yaml
@@ -19,5 +19,3 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
