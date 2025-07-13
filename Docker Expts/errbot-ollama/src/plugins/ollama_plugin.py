@@ -1,7 +1,7 @@
 from errbot import BotPlugin, botcmd
 import requests
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_URL = "http://ol:11434/api/generate"
 OLLAMA_MODEL = "llama3"
 
 class OllamaPlugin(BotPlugin):
