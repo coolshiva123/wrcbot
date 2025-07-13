@@ -10,11 +10,13 @@ class OllamaPlugin(BotPlugin):
     Usage: !ollama <your question>
     """
     @botcmd
-    def ollama(self, msg, args):
+    def aiq(self, msg, args):
         """Ask a question to the local Ollama LLM (llama3)"""
         prompt = args.strip()
         if not prompt:
-            return "Please provide a prompt. Usage: !ollama <your question>"
+            return "Please provide a prompt. Usage: !aiq <your question>"
+        # Post a running emoticon message in the same thread/channel
+        running_msg = self.send(msg.to, ":hourglass_flowing_sand: Fetching answer from Llama 3...", in_reply_to=msg)
         payload = {
             "model": OLLAMA_MODEL,
             "prompt": prompt
@@ -27,12 +29,15 @@ class OllamaPlugin(BotPlugin):
                     try:
                         data = line.decode("utf-8")
                         if '"response":' in data:
-                            # Extract the response text
                             import json
                             resp_json = json.loads(data)
                             answer += resp_json.get("response", "")
                     except Exception:
                         continue
-            return answer.strip() or "(No response from Ollama)"
+            # Send answer and mark as done as replies in the same thread
+            self.send(msg.to, answer.strip() or "(No response from Ollama)", in_reply_to=msg)
+            self.send(msg.to, ":white_check_mark: Done!", in_reply_to=msg)
+            return None
         except Exception as e:
-            return f"Error querying Ollama: {e}"
+            self.send(msg.to, ":x: Error fetching answer.", in_reply_to=msg)
+            return None
