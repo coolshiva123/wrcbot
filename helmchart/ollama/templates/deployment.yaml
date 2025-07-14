@@ -14,6 +14,16 @@ spec:
       labels:
         app: {{ include "ollama.name" . }}
     spec:
+
+      initContainers:
+        - name: pull-llama3
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "ollama pull llama3"]
+          volumeMounts:
+            - name: ollama-data
+              mountPath: /root/.ollama
+
       containers:
         - name: ollama
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -21,3 +31,10 @@ spec:
           ports:
             - containerPort: 11434
           args: ["serve"]
+          volumeMounts:
+            - name: ollama-data
+              mountPath: /root/.ollama
+
+      volumes:
+        - name: ollama-data
+          emptyDir: {}
