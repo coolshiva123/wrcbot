@@ -1,0 +1,10 @@
+[Core]
+Name = ollama_plugin
+Module = ollama_plugin
+Python = 3
+
+[Documentation]
+Description = Query a local Ollama LLM (llama3) and return answers in Slack using the !ollama command.
+
+[Dependencies]
+python = requests
