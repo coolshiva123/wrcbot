@@ -19,7 +19,7 @@ spec:
         - name: pull-llama3
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["sh", "-c", "ollama pull llama3"]
+          command: ["sh", "-c", "ollama serve & sleep 2 && ollama pull llama3"]
           volumeMounts:
             - name: ollama-data
               mountPath: /root/.ollama
