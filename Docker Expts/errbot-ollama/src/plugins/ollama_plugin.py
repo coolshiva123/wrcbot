@@ -1,7 +1,20 @@
+
 from errbot import BotPlugin, botcmd
 import requests
+import os
 
-OLLAMA_URL = "http://ol:11434/api/generate"
+ # Build OLLAMA_URL with fallback mechanisms (if/elif/else, error out if all fail)
+OLLAMA_SERVICE_HOST = os.environ.get("OLLAMA_SERVICE_HOST")
+OLLAMA_SERVICE_PORT = os.environ.get("OLLAMA_SERVICE_PORT", "11434")
+fqdn = "ollama.wrcbot.svc.cluster.local"
+if OLLAMA_SERVICE_HOST:
+    OLLAMA_URL = f"http://{OLLAMA_SERVICE_HOST}:{OLLAMA_SERVICE_PORT}/api/generate"
+elif _can_resolve := __import__('socket').gethostbyname(fqdn) if fqdn else None:
+    OLLAMA_URL = f"http://{fqdn}:11434/api/generate"
+elif __import__('socket').gethostbyname('ollama'):
+    OLLAMA_URL = "http://ollama:11434/api/generate"
+else:
+    raise RuntimeError("Could not determine OLLAMA_URL: set OLLAMA_SERVICE_HOST or ensure DNS for ollama service is available.")
 OLLAMA_MODEL = "llama3"
 
 class OllamaPlugin(BotPlugin):
