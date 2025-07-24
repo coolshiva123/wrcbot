@@ -1,0 +1,7 @@
+This is a sample document for testing the RAG system.
+
+It contains multiple paragraphs to demonstrate the indexing and querying capabilities.
+
+The RAG system uses LlamaIndex for document processing and ChromaDB for vector storage.
+
+This architecture allows for efficient retrieval and answering of questions about the document content.

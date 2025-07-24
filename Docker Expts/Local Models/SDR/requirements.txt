@@ -1,0 +1,8 @@
+llama-index==0.9.43
+python-dotenv==1.0.0
+typing==3.7.4.3
+pydantic==2.1.1
+fpdf==1.7.2
+pymupdf==1.23.5
+pdfminer.six==20221105
+llama-hub==0.0.50
